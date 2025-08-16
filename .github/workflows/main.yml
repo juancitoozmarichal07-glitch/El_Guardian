@@ -36,9 +36,13 @@ jobs:
         mv config.xml temp_build/
         mv index.html temp_build/
 
-    - name: Inject Hugging Face API Key
+    - name: 🕵️‍♂️ Inject Hugging Face API Key
       working-directory: ./temp_build
       run: |
+        if [ -z "${{ secrets.HUGGING_FACE_API_KEY }}" ]; then
+          echo "HUGGING_FACE_API_KEY secret not found!"
+          exit 1
+        fi
         sed -i 's|const HUGGING_FACE_API_KEY = "";|const HUGGING_FACE_API_KEY = "${{ secrets.HUGGING_FACE_API_KEY }}";|' index.html
       
     - name: Add Android Platform
