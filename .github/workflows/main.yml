@@ -1,6 +1,6 @@
 # ==================================================================================
-#  PROYECTO VERIDIAN - WORKFLOW (Versión "Cimientos Sólidos")
-#  Con la estructura de archivos correcta, esto es todo lo que necesitamos.
+#  PROYECTO VERIDIAN - WORKFLOW (Versión "VICTORIA")
+#  El definitivo. Limpio, directo y funcional.
 # ==================================================================================
 
 name: Build, Sign & Upload Veridian APK
@@ -31,43 +31,40 @@ jobs:
     - name: 📦 3. Install Cordova
       run: npm install -g cordova
 
-    # --- FASE 2: INYECCIÓN Y CONSTRUCCIÓN ---
+    # --- FASE 2: INYECCIÓN ---
     - name: 💉 4. Inject API Key
       run: sed -i 's|const HUGGING_FACE_API_KEY = "";|const HUGGING_FACE_API_KEY = "${{ secrets.HUGGING_FACE_API_KEY }}";|g' www/index.html
 
+    # --- FASE 3: CONSTRUCCIÓN ---
     - name: 🏗️ 5. Build Project
       run: |
+        # Creamos el proyecto y entramos en él
         cordova create build_dir io.veridian.app Veridian
-        rm -rf build_dir/www
-        cp -r www build_dir/
-        cp config.xml build_dir/
         cd build_dir
+
+        # Limpiamos el www por defecto y copiamos el nuestro
+        rm -rf www
+        cp -r ../www .
+        cp ../config.xml .
+        
+        # Añadimos plataforma y construimos
         cordova platform add android@latest
         cordova build android --release -- --arch=arm64-v8a
 
-          run: |
-        # --- GOLPE DE GRACIA ---
-        # Nos movemos DENTRO del directorio de construcción para que no haya dudas de rutas.
-        cd build_dir
-
-        # Definimos las rutas relativas al nuevo directorio de trabajo
+    # --- FASE 4: FIRMA ---
+    - name: ✍️ 6. Sign Final APK
+      # Nos movemos al directorio de construcción para que las rutas sean simples
+      working-directory: ./build_dir
+      run: |
+        # Definimos las rutas relativas
         UNSIGNED_APK="platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk"
         SIGNED_APK="veridian-final.apk"
         KEYSTORE="veridian.keystore"
 
-        echo "--> Directorio actual: $(pwd)"
-        echo "--> Verificando si el APK sin firmar existe en la ruta relativa: ${UNSIGNED_APK}"
-        
-        if [ ! -f "$UNSIGNED_APK" ]; then
-          echo "❌ ¡IMPOSIBLE! El APK sin firmar no se encontró después de movernos al directorio."
-          ls -R
-          exit 1
-        fi
-
-        echo "--> Creando Keystore..."
+        # Creamos el Keystore
         keytool -genkey -v -keystore ${KEYSTORE} -alias v -keyalg RSA -keysize 2048 -validity 10000 -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -keypass "${{ secrets.KEY_PASSWORD }}" -dname "CN=Veridian,O=V,C=UY"
         
-        echo "--> Firmando el APK. Sin excusas."
+        # Firmamos el APK
         jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 \
         -keystore ${KEYSTORE} \
         -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
@@ -76,8 +73,7 @@ jobs:
         ${UNSIGNED_APK} \
         v
 
-        jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore ${KEYSTORE} -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -keypass "${{ secrets.KEY_PASSWORD }}" -signedjar ${SIGNED_APK} ${UNSIGNED_APK} v
-
+    # --- FASE 5: ENTREGA ---
     - name: 🚀 7. Upload Final APK
       uses: actions/upload-artifact@v4
       with:
