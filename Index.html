@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Veridian</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+        body {
+            background-color: #0a0a1a;
+            color: #e0e0ff;
+            font-family: 'Orbitron', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            text-align: center;
+        }
+        h1 {
+            color: #00ffff;
+            text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
+            margin-bottom: 10px;
+        }
+        p {
+            color: #9a9aff;
+            margin-bottom: 30px;
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            background-color: rgba(0, 255, 255, 0.05);
+            border: 1px solid #00ffff;
+            border-radius: 10px;
+            color: #e0e0ff;
+            padding: 15px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            box-sizing: border-box;
+            margin-bottom: 20px;
+            resize: vertical;
+        }
+        button {
+            background: linear-gradient(45deg, #00ffff, #00aaff);
+            border: none;
+            border-radius: 50px;
+            color: #0a0a1a;
+            padding: 15px 30px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 18px;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 0 0 20px #00ffff;
+            transition: all 0.3s ease;
+            margin-bottom: 30px;
+        }
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px #00ffff;
+        }
+        .resultado-wrapper {
+            width: 100%;
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 1px dashed #9a9aff;
+            border-radius: 10px;
+            padding: 20px;
+            min-height: 100px;
+            text-align: left;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Courier New', Courier, monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Veridian</h1>
+        <p>El corrector de textos inteligente</p>
+        
+        <textarea id="texto-entrada" placeholder="Escribe o pega aquí el texto para pulir..."></textarea>
+        
+        <button id="boton-pulir">Comenzar a Pulir</button>
+        
+        <div class="resultado-wrapper">
+            <p id="texto-salida">El resultado pulido aparecerá aquí...</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- VARIABLES DE CONFIGURACIÓN ---
+            const HUGGING_FACE_API_KEY = ""; // Esta línea será reemplazada por el robot
+            const botonPulir = document.getElementById('boton-pulir');
+            const textoEntrada = document.getElementById('texto-entrada');
+            const textoSalida = document.getElementById('texto-salida');
+
+            // --- FUNCIÓN PRINCIPAL DE LA NAVE ESPACIAL ---
+            async function llamarFormula1(texto) {
+                const API_URL = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-70B-Instruct";
+                const prompt = `Eres un asistente de escritura experto. Corrige el siguiente texto. Devuelve solo el texto corregido.\n\nOriginal: "${texto}"\n\nCorregido:`;
+                
+                textoSalida.textContent = "Procesando con el motor de Fórmula 1...";
+
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 
+                            'Authorization': `Bearer ${HUGGING_FACE_API_KEY}`, 
+                            'Content-Type': 'application/json' 
+                        },
+                        body: JSON.stringify({ 
+                            inputs: prompt, 
+                            parameters: { max_new_tokens: 500, return_full_text: false } 
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Error del servidor: ${response.status} ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+                    
+                    if (result && result[0] && result[0].generated_text) {
+                        return result[0].generated_text.trim();
+                    } else {
+                        throw new Error("La respuesta de la API no tiene el formato esperado.");
+                    }
+
+                } catch (error) {
+                    console.error("Error en la Fórmula 1:", error);
+                    return `Error: Falla en el motor de la IA. Detalles: ${error.message}`;
+                }
+            }
+
+            // --- CONECTAR EL BOTÓN AL MOTOR ---
+            if (botonPulir) {
+                botonPulir.addEventListener('click', async () => {
+                    const textoOriginal = textoEntrada.value;
+                    if (textoOriginal.trim() === "") {
+                        textoSalida.textContent = "Por favor, introduce un texto para pulir.";
+                        return;
+                    }
+                    
+                    const textoCorregido = await llamarFormula1(textoOriginal);
+                    textoSalida.textContent = textoCorregido;
+                });
+            }
+        });
+    </script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Veridian</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+        body {
+            background-color: #0a0a1a;
+            color: #e0e0ff;
+            font-family: 'Orbitron', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            text-align: center;
+        }
+        h1 {
+            color: #00ffff;
+            text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
+            margin-bottom: 10px;
+        }
+        p {
+            color: #9a9aff;
+            margin-bottom: 30px;
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            background-color: rgba(0, 255, 255, 0.05);
+            border: 1px solid #00ffff;
+            border-radius: 10px;
+            color: #e0e0ff;
+            padding: 15px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            box-sizing: border-box;
+            margin-bottom: 20px;
+            resize: vertical;
+        }
+        button {
+            background: linear-gradient(45deg, #00ffff, #00aaff);
+            border: none;
+            border-radius: 50px;
+            color: #0a0a1a;
+            padding: 15px 30px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 18px;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 0 0 20px #00ffff;
+            transition: all 0.3s ease;
+            margin-bottom: 30px;
+        }
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px #00ffff;
+        }
+        .resultado-wrapper {
+            width: 100%;
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 1px dashed #9a9aff;
+            border-radius: 10px;
+            padding: 20px;
+            min-height: 100px;
+            text-align: left;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Courier New', Courier, monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Veridian</h1>
+        <p>El corrector de textos inteligente</p>
+        
+        <textarea id="texto-entrada" placeholder="Escribe o pega aquí el texto para pulir..."></textarea>
+        
+        <button id="boton-pulir">Comenzar a Pulir</button>
+        
+        <div class="resultado-wrapper">
+            <p id="texto-salida">El resultado pulido aparecerá aquí...</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- VARIABLES DE CONFIGURACIÓN ---
+            const HUGGING_FACE_API_KEY = ""; // Esta línea será reemplazada por el robot
+            const botonPulir = document.getElementById('boton-pulir');
+            const textoEntrada = document.getElementById('texto-entrada');
+            const textoSalida = document.getElementById('texto-salida');
+
+            // --- FUNCIÓN PRINCIPAL DE LA NAVE ESPACIAL ---
+            async function llamarFormula1(texto) {
+                const API_URL = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-70B-Instruct";
+                const prompt = `Eres un asistente de escritura experto. Corrige el siguiente texto. Devuelve solo el texto corregido.\n\nOriginal: "${texto}"\n\nCorregido:`;
+                
+                textoSalida.textContent = "Procesando con el motor de Fórmula 1...";
+
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 
+                            'Authorization': `Bearer ${HUGGING_FACE_API_KEY}`, 
+                            'Content-Type': 'application/json' 
+                        },
+                        body: JSON.stringify({ 
+                            inputs: prompt, 
+                            parameters: { max_new_tokens: 500, return_full_text: false } 
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Error del servidor: ${response.status} ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+                    
+                    if (result && result[0] && result[0].generated_text) {
+                        return result[0].generated_text.trim();
+                    } else {
+                        throw new Error("La respuesta de la API no tiene el formato esperado.");
+                    }
+
+                } catch (error) {
+                    console.error("Error en la Fórmula 1:", error);
+                    return `Error: Falla en el motor de la IA. Detalles: ${error.message}`;
+                }
+            }
+
+            // --- CONECTAR EL BOTÓN AL MOTOR ---
+            if (botonPulir) {
+                botonPulir.addEventListener('click', async () => {
+                    const textoOriginal = textoEntrada.value;
+                    if (textoOriginal.trim() === "") {
+                        textoSalida.textContent = "Por favor, introduce un texto para pulir.";
+                        return;
+                    }
+                    
+                    const textoCorregido = await llamarFormula1(textoOriginal);
+                    textoSalida.textContent = textoCorregido;
+                });
+            }
+        });
+    </script>
+</body>
+</html>
