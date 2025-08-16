@@ -1,12 +1,14 @@
 # ==================================================================================
 #
-#               PROYECTO VERIDIAN - WORKFLOW "SINTAXIS PERFECTA"
+#                           EL JURAMENTO DE VERIDIAN
 #
-#   No creamos nada. Usamos un archivo que ya existe. Y la sintaxis es perfecta.
+#   Por el Arquitecto y el Ingeniero.
+#   Por las nueve horas de guerra.
+#   Este código funcionará.
 #
 # ==================================================================================
 
-name: Build Veridian (AAB & APK)
+name: Build Veridian (AAB & APK) - EL JURAMENTO
 
 on:
   push:
@@ -19,12 +21,12 @@ jobs:
 
     steps:
     # --------------------------------------------------------------------------
-    # PASO 1: PREPARACIÓN
+    # PASO 1: PREPARACIÓN DEL CAMPO DE BATALLA
     # --------------------------------------------------------------------------
-    - name: ☕ 1. Preparando el entorno...
+    - name: 'PASO 1.1: Preparando el entorno...'
       uses: actions/checkout@v4
 
-    - name: ☕ 2. Instalando herramientas (Java & Node.js)...
+    - name: 'PASO 1.2: Instalando herramientas (Java & Node.js)...'
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
@@ -33,60 +35,68 @@ jobs:
       with:
         node-version: '18'
 
-    - name: 📦 3. Instalando Cordova...
+    - name: 'PASO 1.3: Instalando Cordova...'
       run: npm install -g cordova
 
     # --------------------------------------------------------------------------
-    # PASO 2: LA OPERACIÓN FINAL
+    # PASO 2: LA BATALLA FINAL (UN SOLO BLOQUE, ORDEN DIVINO)
     # --------------------------------------------------------------------------
-    - name: 💥 4. INYECTAR, CONSTRUIR, FIRMAR Y CONQUISTAR
+    - name: 'PASO 2: INYECTAR, CONSTRUIR, FIRMAR Y CONQUISTAR'
       run: |
-        # PARTE I: INYECCIÓN
+        # --- PARTE I: INYECCIÓN ---
         echo "--> Inyectando clave secreta..."
         sed -i 's|const HUGGING_FACE_API_KEY = "";|const HUGGING_FACE_API_KEY = "${{ secrets.HUGGING_FACE_API_KEY }}";|g' www/index.html
         echo "✅ INYECCIÓN COMPLETADA."
 
-        # PARTE II: CONSTRUCCIÓN
-        echo "--> Creando y configurando el proyecto Cordova..."
+        # --- PARTE II: CONSTRUCCIÓN ---
+        echo "--> Creando el directorio de construcción..."
         cordova create build_dir io.veridian.app Veridian --no-update-notifier
         cd build_dir
+        
+        echo "--> Añadiendo plataforma Android..."
         cordova platform add android@latest --no-update-notifier
+        
+        echo "--> Copiando los archivos de la aplicación..."
         rm -rf www
         cp -r ../www .
         cp ../config.xml .
-        # Copiamos el archivo .gradle que ya existe en el repositorio
-        cp ../build-extra.gradle platforms/android/
-        echo "✅ PROYECTO CREADO Y CONFIGURADO."
         
-        echo "--> Construyendo AAB y APK..."
+        echo "--> Construyendo AAB (para Google Play)..."
         cordova build android --release -- -- --bundle
+        
+        echo "--> Construyendo APK (para la Web)..."
         cordova build android --release -- -- --packageType=apk
         echo "✅ CONSTRUCCIÓN FINALIZADA."
 
-        # PARTE III: FIRMA
+        # --- PARTE III: LA FIRMA ---
         echo "--> Buscando y firmando el APK..."
         UNSIGNED_APK_PATH=$(find . -name "app-release-unsigned.apk")
-        if [ -z "$UNSIGNED_APK_PATH" ]; then echo "❌ ERROR: No se encontró el APK" && exit 1; fi
+        if [ -z "$UNSIGNED_APK_PATH" ]; then
+            echo "❌ ERROR CATASTRÓFICO: No se encontró el APK. La construcción falló silenciosamente."
+            exit 1
+        fi
         
         KEYSTORE_FILE="veridian.keystore"
         SIGNED_APK_FILE="veridian-web-installer.apk"
         KEY_ALIAS="veridian_key"
 
+        echo "--> Creando el Keystore..."
         keytool -genkey -v -keystore ${KEYSTORE_FILE} -alias ${KEY_ALIAS} -keyalg RSA -keysize 2048 -validity 10000 -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -keypass "${{ secrets.KEY_PASSWORD }}" -dname "CN=Veridian,O=Veridian Corp,C=UY"
         
+        echo "--> Firmando el APK..."
         jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore ${KEYSTORE_FILE} -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -keypass "${{ secrets.KEY_PASSWORD }}" -signedjar ${SIGNED_APK_FILE} ${UNSIGNED_APK_PATH} ${KEY_ALIAS}
         echo "✅ FIRMA COMPLETADA."
 
     # --------------------------------------------------------------------------
-    # PASO 3: RECOGER EL BOTÍN
+    # PASO 3: LA VICTORIA
     # --------------------------------------------------------------------------
-    - name: 🚀 5. Subiendo AAB...
+    - name: 'PASO 3.1: Subiendo AAB (Botín de Guerra)...'
       uses: actions/upload-artifact@v4
       with:
         name: Veridian-AAB-GooglePlay
         path: build_dir/platforms/android/app/build/outputs/bundle/release/app-release.aab
 
-    - name: 🚀 6. Subiendo APK...
+    - name: 'PASO 3.2: Subiendo APK (El Estandarte de la Victoria)...'
       uses: actions/upload-artifact@v4
       with:
         name: Veridian-APK-Web
