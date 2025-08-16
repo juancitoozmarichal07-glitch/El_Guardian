@@ -1,6 +1,6 @@
 # ==================================================================================
-#  PROYECTO VERIDIAN - WORKFLOW (Versión "Teletransporte")
-#  Basta de errores. Enfoque directo y a prueba de fallos.
+#  PROYECTO VERIDIAN - WORKFLOW (Versión "Cimientos Sólidos")
+#  Con la estructura de archivos correcta, esto es todo lo que necesitamos.
 # ==================================================================================
 
 name: Build, Sign & Upload Veridian APK
@@ -16,7 +16,7 @@ jobs:
 
     steps:
     # --- FASE 1: PREPARACIÓN ---
-    - name: ☕ 1. Checkout
+    - name: ☕ 1. Checkout Repository
       uses: actions/checkout@v4
 
     - name: ☕ 2. Setup Java & Node.js
@@ -31,54 +31,30 @@ jobs:
     - name: 📦 3. Install Cordova
       run: npm install -g cordova
 
-    # --- FASE 2: INYECCIÓN PRIMERO, CONSTRUCCIÓN DESPUÉS ---
-    - name: 💉 4. Inject API Key DIRECTLY into the source www/index.html
-      run: |
-        echo "--> Modificando el archivo fuente en www/index.html..."
-        sed -i 's|const HUGGING_FACE_API_KEY = "";|const HUGGING_FACE_API_KEY = "${{ secrets.HUGGING_FACE_API_KEY }}";|g' www/index.html
-        echo "✅ Clave inyectada en el archivo fuente."
+    # --- FASE 2: INYECCIÓN Y CONSTRUCCIÓN ---
+    - name: 💉 4. Inject API Key
+      run: sed -i 's|const HUGGING_FACE_API_KEY = "";|const HUGGING_FACE_API_KEY = "${{ secrets.HUGGING_FACE_API_KEY }}";|g' www/index.html
 
-    # --- FASE 3: CONSTRUCCIÓN ---
-    - name: 🏗️ 5. Create and Build Cordova Project
+    - name: 🏗️ 5. Build Project
       run: |
-        # Creamos el proyecto en un directorio temporal
-        cordova create temp_build io.veridian.app Veridian
-        
-        # Borramos la carpeta www por defecto que crea Cordova
-        rm -rf temp_build/www
-        
-        # Copiamos nuestra carpeta www (ya con la clave inyectada) al proyecto
-        cp -r www temp_build/
-        
-        # Copiamos el config.xml
-        cp config.xml temp_build/
-        
-        # Entramos al directorio y construimos
-        cd temp_build
+        cordova create build_dir io.veridian.app Veridian
+        rm -rf build_dir/www
+        cp -r www build_dir/
+        cp config.xml build_dir/
+        cd build_dir
         cordova platform add android@latest
         cordova build android --release -- --arch=arm64-v8a
 
-    # --- FASE 4: FIRMA Y ENTREGA ---
+    # --- FASE 3: FIRMA Y ENTREGA ---
     - name: ✍️ 6. Sign and Finalize APK
       run: |
-        KEYSTORE_PATH="temp_build/veridian-release-key.keystore"
-        UNSIGNED_APK_PATH="temp_build/platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk"
-        SIGNED_APK_PATH="veridian-final.apk"
+        UNSIGNED_APK="build_dir/platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk"
+        SIGNED_APK="veridian-final.apk"
+        KEYSTORE="build_dir/veridian.keystore"
 
-        echo "--> Creando Keystore en ${KEYSTORE_PATH}"
-        keytool -genkey -v -keystore ${KEYSTORE_PATH} \
-        -alias veridian_alias -keyalg RSA -keysize 2048 -validity 10000 \
-        -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -keypass "${{ secrets.KEY_PASSWORD }}" \
-        -dname "CN=Veridian, OU=AI, O=Veridian Corp, L=Montevideo, S=Uruguay, C=UY"
-
-        echo "--> Firmando ${UNSIGNED_APK_PATH}"
-        jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 \
-        -keystore ${KEYSTORE_PATH} \
-        -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-        -keypass "${{ secrets.KEY_PASSWORD }}" \
-        -signedjar ${SIGNED_APK_PATH} \
-        ${UNSIGNED_APK_PATH} \
-        veridian_alias
+        keytool -genkey -v -keystore ${KEYSTORE} -alias v -keyalg RSA -keysize 2048 -validity 10000 -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -keypass "${{ secrets.KEY_PASSWORD }}" -dname "CN=Veridian,O=V,C=UY"
+        
+        jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore ${KEYSTORE} -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -keypass "${{ secrets.KEY_PASSWORD }}" -signedjar ${SIGNED_APK} ${UNSIGNED_APK} v
 
     - name: 🚀 7. Upload Final APK
       uses: actions/upload-artifact@v4
