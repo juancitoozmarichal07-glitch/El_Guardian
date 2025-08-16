@@ -1,13 +1,11 @@
 # =========================================================================
-# ==               MAIN.YML - VERIDIAN APK FACTORY v1.0                  ==
-# ==        Diseñado por Manus para una operación infalible.             ==
+# ==               MAIN.YML - VERIDIAN APK FACTORY v1.1                  ==
+# ==        Añadido GPS para el firmador. Ahora es infalible.            ==
 # =========================================================================
 name: Build Veridian Universal APK
 
 on:
-  # Permite ejecutarlo manualmente desde la pestaña "Actions"
   workflow_dispatch:
-  # Se ejecuta automáticamente cada vez que haces un cambio en la rama "main"
   push:
     branches: [ "main" ]
 
@@ -64,7 +62,6 @@ jobs:
       run: cordova build android --release -- --arch=arm64-v8a
 
     - name: 🖋️ 10. Create Keystore for Signing
-      working-directory: temp_build/platforms/android/app
       run: |
         keytool -genkey -v \
           -keystore veridian-release-key.keystore \
@@ -77,22 +74,20 @@ jobs:
           -dname "CN=Veridian, OU=AI, O=Veridian Corp, L=Montevideo, S=Uruguay, C=UY"
 
     - name: ✍️ 11. Sign the APK
-      working-directory: temp_build/platforms/android/app
       run: |
         jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 \
           -keystore veridian-release-key.keystore \
           -storepass ${{ secrets.KEYSTORE_PASSWORD }} \
           -keypass ${{ secrets.KEY_PASSWORD }} \
-          build/outputs/apk/release/app-release-unsigned.apk \
+          temp_build/platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk \
           veridian_alias
 
     - name: 🏷️ 12. Rename Final APK
-      working-directory: temp_build/platforms/android/app/build/outputs/apk/release
-      run: mv app-release-unsigned.apk Veridian-Universal.apk
+      run: mv temp_build/platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk Veridian-Universal.apk
         
     # --- PASO 4: ENTREGA DEL PRODUCTO ---
     - name: 🚀 13. Upload Universal APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: Veridian-Universal-APK
-        path: temp_build/platforms/android/app/build/outputs/apk/release/Veridian-Universal.apk
+        path: Veridian-Universal.apk
