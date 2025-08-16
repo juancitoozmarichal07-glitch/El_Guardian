@@ -1,22 +1,17 @@
-# =========================================================================
-# ==               MAIN.YML - VERIDIAN APK FACTORY v1.1                  ==
-# ==        Añadido GPS para el firmador. Ahora es infalible.            ==
-# =========================================================================
-name: Build Veridian Universal APK
+name: Build, Sign & Upload APK
 
 on:
-  workflow_dispatch:
   push:
     branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
-  build-and-sign:
-    name: 🏗️ Build, Sign & Upload APK
+  build:
     runs-on: ubuntu-latest
 
     steps:
-    # --- PASO 1: PREPARACIÓN DEL ENTORNO ---
-    - name: 📥 1. Checkout Repository
+    # 1. Poner el café y preparar la mesa de trabajo
+    - name: ☕ 1. Checkout Repository
       uses: actions/checkout@v4
 
     - name: ☕ 2. Setup Java (JDK 17)
@@ -30,64 +25,71 @@ jobs:
       with:
         node-version: '18'
 
+    # 2. Instalar las herramientas
     - name: 📦 4. Install Cordova
       run: npm install -g cordova
 
-    # --- PASO 2: PREPARACIÓN DEL PROYECTO ---
+    # 3. Crear un espacio de trabajo limpio
     - name: 📁 5. Create Temporary Build Directory
-      run: mkdir temp_build
+      run: mkdir -p temp_build
 
+    # 4. Mover los ingredientes a la mesa de trabajo
     - name: 🚚 6. Move Project Files
       run: |
         mv www temp_build/
         mv config.xml temp_build/
-        mv index.html temp_build/
+        mv index.html temp_build/www/
 
+    # 5. Inyectar la clave secreta de la IA
     - name: 💉 7. Inject Hugging Face API Key
-      working-directory: ./temp_build
+      working-directory: ./temp_build/www
       run: |
         if [ -z "${{ secrets.HUGGING_FACE_API_KEY }}" ]; then
-          echo "ERROR: El secreto HUGGING_FACE_API_KEY no fue encontrado."
+          echo "HUGGING_FACE_API_KEY secret not found!"
           exit 1
         fi
-        sed -i 's|const HUGGING_FACE_API_KEY = "";|const HUGGING_FACE_API_KEY = "${{ secrets.HUGGING_FACE_API_KEY }}";|' index.html
-      
+        sed -i "s|const HUGGING_FACE_API_KEY = \"\";|const HUGGING_FACE_API_KEY = \"${{ secrets.HUGGING_FACE_API_KEY }}\";|g" index.html
+
+    # 6. Preparar la plataforma Android
     - name: 🤖 8. Add Android Platform
       working-directory: ./temp_build
       run: cordova platform add android
 
-    # --- PASO 3: COMPILACIÓN Y FIRMA ---
+    # 7. Construir el APK (sin firmar)
     - name: 🛠️ 9. Build Unsigned APK (for arm64-v8a)
       working-directory: ./temp_build
-      run: cordova build android --release -- --arch=arm64-v8a
+      run: cordova build android --release -- -- --arch=arm64-v8a
 
+    # 8. Crear el archivo de firma (Keystore)
     - name: 🖋️ 10. Create Keystore for Signing
+      working-directory: ./temp_build
       run: |
-        keytool -genkey -v \
-          -keystore veridian-release-key.keystore \
-          -alias veridian_alias \
-          -keyalg RSA \
-          -keysize 2048 \
-          -validity 10000 \
-          -storepass ${{ secrets.KEYSTORE_PASSWORD }} \
-          -keypass ${{ secrets.KEY_PASSWORD }} \
-          -dname "CN=Veridian, OU=AI, O=Veridian Corp, L=Montevideo, S=Uruguay, C=UY"
+        keytool -genkey -v -keystore veridian-release-key.keystore \
+        -alias veridian_alias \
+        -keyalg RSA -keysize 2048 -validity 10000 \
+        -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+        -keypass "${{ secrets.KEY_PASSWORD }}" \
+        -dname "CN=Veridian, OU=AI, O=Veridian Corp, L=Montevideo, S=Uruguay, C=UY"
 
+    # 9. Firmar el APK (¡CON EL GPS CORREGIDO!)
     - name: ✍️ 11. Sign the APK
+      working-directory: ./temp_build  # <--- ¡LA LÍNEA CLAVE! Le decimos dónde trabajar.
       run: |
         jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 \
-          -keystore veridian-release-key.keystore \
-          -storepass ${{ secrets.KEYSTORE_PASSWORD }} \
-          -keypass ${{ secrets.KEY_PASSWORD }} \
-          temp_build/platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk \
-          veridian_alias
+        -keystore veridian-release-key.keystore \
+        -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+        -keypass "${{ secrets.KEY_PASSWORD }}" \
+        platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk \
+        veridian_alias
 
+    # 10. Renombrar el APK final para que sea más bonito
     - name: 🏷️ 12. Rename Final APK
-      run: mv temp_build/platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk Veridian-Universal.apk
-        
-    # --- PASO 4: ENTREGA DEL PRODUCTO ---
+      working-directory: ./temp_build
+      run: mv platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk veridian-universal.apk
+
+    # 11. Subir el APK como un artefacto para descargar
     - name: 🚀 13. Upload Universal APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: Veridian-Universal-APK
-        path: Veridian-Universal.apk
+        path: temp_build/veridian-universal.apk
