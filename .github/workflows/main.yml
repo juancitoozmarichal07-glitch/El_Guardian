@@ -1,13 +1,9 @@
 # ==================================================================================
 #
-#               PROYECTO VERIDIAN - WORKFLOW "TODO EN UNO"
+#               PROYECTO VERIDIAN - WORKFLOW "EL INGENIERO JEFE"
 #
-#   Arquitecto: Tú
-#   Ingeniero Jefe: Manus
 #   Versión: Se acabó la puta broma.
-#
-#   OBJETIVO: Construir AAB y APK, firmar el APK, y subir ambos.
-#             Todo en un solo bloque. Sin excusas. Sin piedad.
+#   UPDATE: Forzando una versión de Gradle estable.
 #
 # ==================================================================================
 
@@ -51,10 +47,6 @@ jobs:
         # PARTE I: LA INYECCIÓN
         # -------------------------------------------------
         echo "--> PARTE I: Inyectando clave secreta en www/index.html..."
-        if [ ! -f "www/index.html" ]; then
-            echo "❌ ERROR FATAL: El archivo www/index.html no existe. ¡Abortando!"
-            exit 1
-        fi
         sed -i 's|const HUGGING_FACE_API_KEY = "";|const HUGGING_FACE_API_KEY = "${{ secrets.HUGGING_FACE_API_KEY }}";|g' www/index.html
         echo "✅ INYECCIÓN COMPLETADA."
         echo "-------------------------------------------------"
@@ -63,12 +55,16 @@ jobs:
         # PARTE II: LA CONSTRUCCIÓN
         # -------------------------------------------------
         echo "--> PARTE II: Creando y configurando el proyecto Cordova..."
-        cordova create build_dir io.veridian.app Veridian
+        cordova create build_dir io.veridian.app Veridian --no-update-notifier
         cd build_dir
         rm -rf www
         cp -r ../www .
         cp ../config.xml .
-        cordova platform add android@latest
+        
+        # ¡¡¡LA LÍNEA CLAVE!!! Creamos un archivo para forzar la versión de Gradle.
+        echo "android.gradle.distributionUrl=https://services.gradle.org/distributions/gradle-8.4-bin.zip" > platforms/android/gradle.properties
+        
+        cordova platform add android@latest --no-update-notifier
         echo "✅ PROYECTO CREADO."
         
         echo "--> Construyendo AAB (para Google Play)..."
@@ -88,7 +84,6 @@ jobs:
         
         if [ -z "$UNSIGNED_APK_PATH" ]; then
             echo "❌ ERROR CATASTRÓFICO: ¡No se encontró el APK (app-release-unsigned.apk) después del build!"
-            echo "--> Contenido del directorio de outputs para depurar:"
             find ./platforms/android/app/build/outputs -type f
             exit 1
         fi
