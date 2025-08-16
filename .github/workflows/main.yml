@@ -53,18 +53,36 @@ jobs:
       working-directory: ./temp_build
       run: cordova build android --release -- --arch=arm64-v8a
 
-    - name: Sign App Bundle
+    - name: Create Keystore
       working-directory: temp_build/platforms/android/app
       run: |
-        jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore ${{ secrets.KEYSTORE_PATH }} -storepass ${{ secrets.KEYSTORE_PASSWORD }} build/outputs/apk/release/app-release-unsigned.apk ${{ secrets.KEY_ALIAS }}
+        keytool -genkey -v \
+          -keystore veridian-release-key.keystore \
+          -alias veridian_alias \
+          -keyalg RSA \
+          -keysize 2048 \
+          -validity 10000 \
+          -storepass ${{ secrets.KEYSTORE_PASSWORD }} \
+          -keypass ${{ secrets.KEY_PASSWORD }} \
+          -dname "CN=Veridian, OU=AI, O=Veridian Corp, L=Montevideo, S=Uruguay, C=UY"
 
-    - name: Generate Final APK
+    - name: Sign Final APK
+      working-directory: temp_build/platforms/android/app
+      run: |
+        jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 \
+          -keystore veridian-release-key.keystore \
+          -storepass ${{ secrets.KEYSTORE_PASSWORD }} \
+          -keypass ${{ secrets.KEY_PASSWORD }} \
+          build/outputs/apk/release/app-release-unsigned.apk \
+          veridian_alias
+
+    - name: Rename Final APK
       working-directory: temp_build/platforms/android/app/build/outputs/apk/release
       run: |
-        mv app-release-unsigned.apk app-release-signed.apk
+        mv app-release-unsigned.apk Veridian-Universal.apk
         
     - name: Upload Universal APK
       uses: actions/upload-artifact@v4
       with:
         name: Veridian-Universal-APK
-        path: temp_build/platforms/android/app/build/outputs/apk/release/app-release-signed.apk
+        path: temp_build/platforms/android/app/build/outputs/apk/release/Veridian-Universal.apk
