@@ -1,4 +1,16 @@
-name: Build, Sign & Upload APK
+# ==================================================================================
+#  PROYECTO VERIDIAN - WORKFLOW DE CONSTRUCCIÓN BLINDADO (Versión "Búnker")
+#  Arquitecto: Juan Gonzalo Marichal
+#  Ingeniero Jefe: Manus
+# ==================================================================================
+#
+#  Este workflow está diseñado para ser a prueba de fallos. Cada paso verifica
+#  el anterior, y los directorios de trabajo se gestionan de forma explícita
+#  para eliminar cualquier ambigüedad.
+#
+# ==================================================================================
+
+name: Build, Sign & Upload Veridian APK
 
 on:
   push:
@@ -6,63 +18,74 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-and-sign:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Poner el café y preparar la mesa de trabajo
-    - name: ☕ 1. Checkout Repository
+    # --- FASE 1: PREPARACIÓN DEL ENTORNO ---
+    - name: ☕ 1. Preparar la Mesa de Trabajo (Checkout)
       uses: actions/checkout@v4
 
-    - name: ☕ 2. Setup Java (JDK 17)
+    - name: ☕ 2. Instalar Herramientas Esenciales (Java & Node.js)
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
-
-    - name: NODE 3. Setup Node.js (v18)
-      uses: actions/setup-node@v4
+    - uses: actions/setup-node@v4
       with:
         node-version: '18'
 
-    # 2. Instalar las herramientas
-    - name: 📦 4. Install Cordova
+    - name: 📦 3. Instalar Cordova Globalmente
       run: npm install -g cordova
 
-    # 3. Crear un espacio de trabajo limpio
-    - name: 📁 5. Create Temporary Build Directory
-      run: mkdir -p temp_build
-
-    # 4. Mover los ingredientes a la mesa de trabajo
-    - name: 🚚 6. Move Project Files
+    # --- FASE 2: CONSTRUCCIÓN DEL PROYECTO ---
+    # Se crea un proyecto Cordova limpio para evitar conflictos y se copian los archivos.
+    - name: 🏗️ 4. Preparar Proyecto Cordova
       run: |
-        mv www temp_build/
-        mv config.xml temp_build/
-        mv index.html temp_build/www/
-
-    # 5. Inyectar la clave secreta de la IA
-    - name: 💉 7. Inject Hugging Face API Key
-      working-directory: ./temp_build/www
+        cordova create veridian_build io.veridian.app Veridian
+        cp config.xml veridian_build/
+        cp -r www/ veridian_build/
+        
+    - name: 💉 5. Inyectar Clave Secreta de la IA
+      working-directory: ./veridian_build
       run: |
-        if [ -z "${{ secrets.HUGGING_FACE_API_KEY }}" ]; then
-          echo "HUGGING_FACE_API_KEY secret not found!"
+        echo "--> Buscando el archivo de destino para la API Key..."
+        TARGET_FILE="www/index.html"
+        PLACEHOLDER='const HUGGING_FACE_API_KEY = "";'
+        
+        if ! grep -q "$PLACEHOLDER" "$TARGET_FILE"; then
+          echo "❌ ERROR: El marcador de posición para la API Key no fue encontrado en $TARGET_FILE."
           exit 1
         fi
-        sed -i "s|const HUGGING_FACE_API_KEY = \"\";|const HUGGING_FACE_API_KEY = \"${{ secrets.HUGGING_FACE_API_KEY }}\";|g" index.html
+        
+        sed -i "s|$PLACEHOLDER|const HUGGING_FACE_API_KEY = \"${{ secrets.HUGGING_FACE_API_KEY }}\";|g" "$TARGET_FILE"
+        echo "✅ Clave de Hugging Face inyectada correctamente."
 
-    # 6. Preparar la plataforma Android
-    - name: 🤖 8. Add Android Platform
-      working-directory: ./temp_build
-      run: cordova platform add android
+    - name: 🤖 6. Añadir Plataforma Android
+      working-directory: ./veridian_build
+      run: cordova platform add android@latest
 
-    # 7. Construir el APK (sin firmar)
-    - name: 🛠️ 9. Build Unsigned APK (for arm64-v8a)
-      working-directory: ./temp_build
-      run: cordova build android --release -- -- --arch=arm64-v8a
+    - name: 🛠️ 7. Construir APK (Unsigned)
+      working-directory: ./veridian_build
+      run: cordova build android --release -- --arch=arm64-v8a
 
-    # 8. Crear el archivo de firma (Keystore)
-    - name: 🖋️ 10. Create Keystore for Signing
-      working-directory: ./temp_build
+    # --- FASE 3: FIRMA Y FINALIZACIÓN (ZONA CRÍTICA) ---
+    - name: 🔍 8. VERIFICAR existencia del APK sin firmar
+      id: check_apk
+      working-directory: ./veridian_build
+      run: |
+        APK_PATH="platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk"
+        if [ -f "$APK_PATH" ]; then
+          echo "✅ ¡Éxito! APK sin firmar encontrado en: $APK_PATH"
+          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+        else
+          echo "❌ ¡FALLO CRÍTICO! No se encontró el APK sin firmar. Revisando la estructura de directorios..."
+          ls -R platforms/android/app/build/outputs/
+          exit 1
+        fi
+
+    - name: 🖋️ 9. Crear Archivo de Firma (Keystore)
+      working-directory: ./veridian_build
       run: |
         keytool -genkey -v -keystore veridian-release-key.keystore \
         -alias veridian_alias \
@@ -70,26 +93,23 @@ jobs:
         -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
         -keypass "${{ secrets.KEY_PASSWORD }}" \
         -dname "CN=Veridian, OU=AI, O=Veridian Corp, L=Montevideo, S=Uruguay, C=UY"
-
-    # 9. Firmar el APK (¡CON EL GPS CORREGIDO!)
-    - name: ✍️ 11. Sign the APK
-      working-directory: ./temp_build  # <--- ¡LA LÍNEA CLAVE! Le decimos dónde trabajar.
+      
+    - name: ✍️ 10. Firmar el APK (Operación Atómica)
+      working-directory: ./veridian_build
       run: |
+        echo "--> Firmando el APK..."
         jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 \
         -keystore veridian-release-key.keystore \
         -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
         -keypass "${{ secrets.KEY_PASSWORD }}" \
-        platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk \
+        -signedjar veridian-v1.0-universal.apk \
+        ${{ steps.check_apk.outputs.apk_path }} \
         veridian_alias
+        echo "✅ APK firmado y finalizado como veridian-v1.0-universal.apk"
 
-    # 10. Renombrar el APK final para que sea más bonito
-    - name: 🏷️ 12. Rename Final APK
-      working-directory: ./temp_build
-      run: mv platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk veridian-universal.apk
-
-    # 11. Subir el APK como un artefacto para descargar
-    - name: 🚀 13. Upload Universal APK Artifact
+    # --- FASE 4: EMPAQUETADO Y ENTREGA ---
+    - name: 🚀 11. Subir Artefacto Final (El APK Firmado)
       uses: actions/upload-artifact@v4
       with:
-        name: Veridian-Universal-APK
-        path: temp_build/veridian-universal.apk
+        name: Veridian-APK
+        path: ./veridian_build/veridian-v1.0-universal.apk
