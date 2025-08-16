@@ -1,6 +1,6 @@
 # ==================================================================================
-#  PROYECTO VERIDIAN - WORKFLOW (Versión "LÍNEA DE PRODUCCIÓN DUAL")
-#  Construye el AAB para Google Play y el APK para la web. Ambos. A la vez.
+#  PROYECTO VERIDIAN - WORKFLOW (Versión "EL ÚLTIMO SUSPIRO")
+#  Añadiendo el alias que faltaba. El golpe de gracia final.
 # ==================================================================================
 
 name: Build AAB and APK for Veridian
@@ -62,8 +62,9 @@ jobs:
         UNSIGNED_APK=$(find . -name "app-release-unsigned.apk")
         SIGNED_APK="veridian-web-installer.apk"
         KEYSTORE="veridian.keystore"
+        ALIAS="v" # Definimos el alias aquí para que quede claro
 
-        keytool -genkey -v -keystore ${KEYSTORE} -alias v -keyalg RSA -keysize 2048 -validity 10000 -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -keypass "${{ secrets.KEY_PASSWORD }}" -dname "CN=Veridian,O=V,C=UY"
+        keytool -genkey -v -keystore ${KEYSTORE} -alias ${ALIAS} -keyalg RSA -keysize 2048 -validity 10000 -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -keypass "${{ secrets.KEY_PASSWORD }}" -dname "CN=Veridian,O=V,C=UY"
         
         jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 \
         -keystore ${KEYSTORE} \
@@ -71,7 +72,7 @@ jobs:
         -keypass "${{ secrets.KEY_PASSWORD }}" \
         -signedjar ${SIGNED_APK} \
         ${UNSIGNED_APK} \
-        v
+        ${ALIAS} # <-- ¡¡¡EL ALIAS QUE FALTABA!!!
 
     # --- FASE 7: ENTREGA DE AMBOS PRODUCTOS ---
     - name: 🚀 9. Upload AAB Artifact (for Google Play)
