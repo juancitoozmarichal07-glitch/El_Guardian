@@ -49,11 +49,8 @@ jobs:
       working-directory: ./temp_build
       run: cordova build android --release
 
-    - name: 🕵️‍♂️ List files in build output (DEBUG)
-      run: ls -R temp_build/platforms/android/app/build/outputs/
-
-    - name: Upload APK Artifact
+    - name: Upload App Bundle Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: Veridian-APK-Test
-        path: temp_build/platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk
+        name: Veridian-App-Bundle
+        path: temp_build/platforms/android/app/build/outputs/bundle/release/app-release.aab
