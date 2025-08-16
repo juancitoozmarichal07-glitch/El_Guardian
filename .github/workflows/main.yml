@@ -47,7 +47,10 @@ jobs:
 
     - name: Build Android App (Release)
       working-directory: ./temp_build
-      run: cordova build android --release || (cat /home/runner/.cordova/logs/*-build.log && exit 1)
+      run: cordova build android --release
+
+    - name: 🕵️‍♂️ List files in build output (DEBUG)
+      run: ls -R temp_build/platforms/android/app/build/outputs/
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
