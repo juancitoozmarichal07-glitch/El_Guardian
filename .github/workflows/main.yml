@@ -13,6 +13,12 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '11'
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
@@ -41,10 +47,10 @@ jobs:
 
     - name: Build Android App (Release)
       working-directory: ./temp_build
-      run: cordova build android --release
+      run: cordova build android --release || (cat /home/runner/.cordova/logs/*-build.log && exit 1)
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: Veridian-APK-Test
-        path: temp_build/platforms/android/app/build/outputs/apk/**/*.apk
+        path: temp_build/platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk
