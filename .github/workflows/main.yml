@@ -1,6 +1,6 @@
 # ==================================================================================
-#  PROYECTO VERIDIAN - WORKFLOW (Versión "LEÓN DE JUDÁ")
-#  No más inteligencia. Solo fuerza bruta y fe.
+#  PROYECTO VERIDIAN - WORKFLOW (Versión "NO ME VA A GANAR")
+#  Un solo bloque. Sin escapatoria.
 # ==================================================================================
 
 name: Build, Sign & Upload Veridian APK
@@ -31,13 +31,16 @@ jobs:
     - name: 📦 3. Install Cordova
       run: npm install -g cordova
 
-    # --- FASE 2: INYECCIÓN ---
-    - name: 💉 4. Inject API Key
-      run: sed -i 's|const HUGGING_FACE_API_KEY = "";|const HUGGING_FACE_API_KEY = "${{ secrets.HUGGING_FACE_API_KEY }}";|g' www/index.html
-
-    # --- FASE 3: CONSTRUCCIÓN ---
-    - name: 🏗️ 5. Build Project
+    # --- FASE 2: LA EJECUCIÓN FINAL (UN SOLO BLOQUE) ---
+    - name: 💥 4. INJECT, BUILD, SIGN, AND CONQUER
       run: |
+        # --- INYECCIÓN ---
+        echo "--> FASE 1: Inyectando clave..."
+        sed -i 's|const HUGGING_FACE_API_KEY = "";|const HUGGING_FACE_API_KEY = "${{ secrets.HUGGING_FACE_API_KEY }}";|g' www/index.html
+        echo "✅ Clave inyectada."
+
+        # --- CONSTRUCCIÓN ---
+        echo "--> FASE 2: Construyendo proyecto..."
         cordova create build_dir io.veridian.app Veridian
         cd build_dir
         rm -rf www
@@ -45,36 +48,37 @@ jobs:
         cp ../config.xml .
         cordova platform add android@latest
         cordova build android --release -- --arch=arm64-v8a
+        echo "✅ Construcción finalizada."
 
-    # --- FASE 4: EL GOLPE FINAL ---
-    - name: ✍️ 6. Sign Final APK (Brute Force)
-      run: |
-        # Nos movemos al directorio donde está el APK sin firmar. Sin excusas.
-        cd build_dir/platforms/android/app/build/outputs/apk/release
-
-        echo "--> Directorio actual: $(pwd)"
-        echo "--> Archivos en este directorio:"
-        ls -l
-
-        # Creamos el Keystore AQUÍ MISMO.
-        keytool -genkey -v -keystore veridian.keystore \
-        -alias v -keyalg RSA -keysize 2048 -validity 10000 \
-        -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -keypass "${{ secrets.KEY_PASSWORD }}" \
-        -dname "CN=Veridian,O=V,C=UY"
+        # --- VERIFICACIÓN Y FIRMA ---
+        echo "--> FASE 3: Verificando y firmando..."
+        # Usamos 'find' para encontrar el APK, sin importar la ruta exacta.
+        UNSIGNED_APK=$(find . -name "app-release-unsigned.apk")
         
-        # Firmamos el APK. Está a nuestro lado. No puede decir que no lo ve.
+        if [ -z "$UNSIGNED_APK" ]; then
+            echo "❌ ¡FALLO CATASTRÓFICO! No se encontró el APK sin firmar después del build."
+            exit 1
+        fi
+        
+        echo "--> APK sin firmar encontrado en: ${UNSIGNED_APK}"
+        
+        KEYSTORE="veridian.keystore"
+        SIGNED_APK="veridian-final.apk"
+
+        keytool -genkey -v -keystore ${KEYSTORE} -alias v -keyalg RSA -keysize 2048 -validity 10000 -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -keypass "${{ secrets.KEY_PASSWORD }}" -dname "CN=Veridian,O=V,C=UY"
+        
         jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 \
-        -keystore veridian.keystore \
+        -keystore ${KEYSTORE} \
         -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
         -keypass "${{ secrets.KEY_PASSWORD }}" \
-        -signedjar veridian-final.apk \
-        app-release-unsigned.apk \
+        -signedjar ${SIGNED_APK} \
+        ${UNSIGNED_APK} \
         v
+        echo "✅ Firma completada."
 
-    # --- FASE 5: LA VICTORIA ---
-    - name: 🚀 7. Upload Final APK
+    # --- FASE 3: LA ENTREGA ---
+    - name: 🚀 5. Upload Victorious APK
       uses: actions/upload-artifact@v4
       with:
         name: Veridian-APK
-        # La ruta al APK final que creamos en el paso anterior
-        path: build_dir/platforms/android/app/build/outputs/apk/release/veridian-final.apk
+        path: build_dir/veridian-final.apk
