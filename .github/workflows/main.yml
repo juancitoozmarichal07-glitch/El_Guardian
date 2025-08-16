@@ -1,0 +1,50 @@
+name: Build Veridian APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install Cordova
+      run: npm install -g cordova
+
+    - name: Create temporary build directory
+      run: mkdir temp_build
+
+    - name: Move project files to build directory
+      run: |
+        mv www temp_build/
+        mv config.xml temp_build/
+        mv index.html temp_build/
+
+    - name: Inject Hugging Face API Key
+      working-directory: ./temp_build
+      run: |
+        sed -i 's|const HUGGING_FACE_API_KEY = "";|const HUGGING_FACE_API_KEY = "${{ secrets.HUGGING_FACE_API_KEY }}";|' index.html
+      
+    - name: Add Android Platform
+      working-directory: ./temp_build
+      run: cordova platform add android
+
+    - name: Build Android App (Release)
+      working-directory: ./temp_build
+      run: cordova build android --release
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Veridian-APK-Test
+        path: temp_build/platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk
