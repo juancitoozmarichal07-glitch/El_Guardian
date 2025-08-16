@@ -1,6 +1,6 @@
 # ==================================================================================
-#  PROYECTO VERIDIAN - WORKFLOW (Versión "VICTORIA")
-#  El definitivo. Limpio, directo y funcional.
+#  PROYECTO VERIDIAN - WORKFLOW (Versión "LEÓN DE JUDÁ")
+#  No más inteligencia. Solo fuerza bruta y fe.
 # ==================================================================================
 
 name: Build, Sign & Upload Veridian APK
@@ -38,44 +38,43 @@ jobs:
     # --- FASE 3: CONSTRUCCIÓN ---
     - name: 🏗️ 5. Build Project
       run: |
-        # Creamos el proyecto y entramos en él
         cordova create build_dir io.veridian.app Veridian
         cd build_dir
-
-        # Limpiamos el www por defecto y copiamos el nuestro
         rm -rf www
         cp -r ../www .
         cp ../config.xml .
-        
-        # Añadimos plataforma y construimos
         cordova platform add android@latest
         cordova build android --release -- --arch=arm64-v8a
 
-    # --- FASE 4: FIRMA ---
-    - name: ✍️ 6. Sign Final APK
-      # Nos movemos al directorio de construcción para que las rutas sean simples
-      working-directory: ./build_dir
+    # --- FASE 4: EL GOLPE FINAL ---
+    - name: ✍️ 6. Sign Final APK (Brute Force)
       run: |
-        # Definimos las rutas relativas
-        UNSIGNED_APK="platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk"
-        SIGNED_APK="veridian-final.apk"
-        KEYSTORE="veridian.keystore"
+        # Nos movemos al directorio donde está el APK sin firmar. Sin excusas.
+        cd build_dir/platforms/android/app/build/outputs/apk/release
 
-        # Creamos el Keystore
-        keytool -genkey -v -keystore ${KEYSTORE} -alias v -keyalg RSA -keysize 2048 -validity 10000 -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -keypass "${{ secrets.KEY_PASSWORD }}" -dname "CN=Veridian,O=V,C=UY"
+        echo "--> Directorio actual: $(pwd)"
+        echo "--> Archivos en este directorio:"
+        ls -l
+
+        # Creamos el Keystore AQUÍ MISMO.
+        keytool -genkey -v -keystore veridian.keystore \
+        -alias v -keyalg RSA -keysize 2048 -validity 10000 \
+        -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -keypass "${{ secrets.KEY_PASSWORD }}" \
+        -dname "CN=Veridian,O=V,C=UY"
         
-        # Firmamos el APK
+        # Firmamos el APK. Está a nuestro lado. No puede decir que no lo ve.
         jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 \
-        -keystore ${KEYSTORE} \
+        -keystore veridian.keystore \
         -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
         -keypass "${{ secrets.KEY_PASSWORD }}" \
-        -signedjar ${SIGNED_APK} \
-        ${UNSIGNED_APK} \
+        -signedjar veridian-final.apk \
+        app-release-unsigned.apk \
         v
 
-    # --- FASE 5: ENTREGA ---
+    # --- FASE 5: LA VICTORIA ---
     - name: 🚀 7. Upload Final APK
       uses: actions/upload-artifact@v4
       with:
         name: Veridian-APK
-        path: build_dir/veridian-final.apk
+        # La ruta al APK final que creamos en el paso anterior
+        path: build_dir/platforms/android/app/build/outputs/apk/release/veridian-final.apk
