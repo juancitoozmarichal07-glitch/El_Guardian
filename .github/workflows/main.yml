@@ -1,8 +1,8 @@
 # ==================================================================================
 #
-#               PROYECTO VERIDIAN - WORKFLOW "LA ÚLTIMA ESPERANZA"
+#               PROYECTO VERIDIAN - WORKFLOW "SINTAXIS PERFECTA"
 #
-#   No creamos nada. Usamos un archivo que ya existe. Se acabaron los trucos.
+#   No creamos nada. Usamos un archivo que ya existe. Y la sintaxis es perfecta.
 #
 # ==================================================================================
 
@@ -26,12 +26,12 @@ jobs:
 
     - name: ☕ 2. Instalando herramientas (Java & Node.js)...
       uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+      with:
+        distribution: 'temurin'
+        java-version: '17'
     - uses: actions/setup-node@v4
-        with:
-          node-version: '18'
+      with:
+        node-version: '18'
 
     - name: 📦 3. Instalando Cordova...
       run: npm install -g cordova
