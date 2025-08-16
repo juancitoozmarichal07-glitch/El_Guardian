@@ -1,11 +1,10 @@
 # ==================================================================================
 #
-#               PROYECTO VERIDIAN - WORKFLOW "EL INGENIERO JEFE"
+#               PROYECTO VERIDIAN - WORKFLOW "YO PILOTO"
 #
-#   Versión: Se acabó la puta broma.
-#   UPDATE: Forzando una versión de Gradle estable.
+#   Versión: Se acabaron los errores estúpidos. Tomo el control total.
 #
-# ==================================================================================
+e# ==================================================================================
 
 name: Build Veridian (AAB & APK)
 
@@ -20,7 +19,7 @@ jobs:
 
     steps:
     # --------------------------------------------------------------------------
-    # PASO 1: PREPARAR LA MESA DE OPERACIONES
+    # PASO 1: PREPARACIÓN
     # --------------------------------------------------------------------------
     - name: ☕ 1. Preparando el entorno...
       uses: actions/checkout@v4
@@ -38,34 +37,38 @@ jobs:
       run: npm install -g cordova
 
     # --------------------------------------------------------------------------
-    # PASO 2: LA OPERACIÓN A CORAZÓN ABIERTO (UN SOLO BLOQUE)
+    # PASO 2: LA OPERACIÓN FINAL (UN SOLO BLOQUE, ORDEN CORRECTO)
     # --------------------------------------------------------------------------
     - name: 💥 4. INYECTAR, CONSTRUIR, FIRMAR Y CONQUISTAR
       id: the_final_battle
       run: |
         # -------------------------------------------------
-        # PARTE I: LA INYECCIÓN
+        # PARTE I: INYECCIÓN
         # -------------------------------------------------
-        echo "--> PARTE I: Inyectando clave secreta en www/index.html..."
+        echo "--> PARTE I: Inyectando clave secreta..."
         sed -i 's|const HUGGING_FACE_API_KEY = "";|const HUGGING_FACE_API_KEY = "${{ secrets.HUGGING_FACE_API_KEY }}";|g' www/index.html
         echo "✅ INYECCIÓN COMPLETADA."
         echo "-------------------------------------------------"
 
         # -------------------------------------------------
-        # PARTE II: LA CONSTRUCCIÓN
+        # PARTE II: CONSTRUCCIÓN (ORDEN CORREGIDO)
         # -------------------------------------------------
         echo "--> PARTE II: Creando y configurando el proyecto Cordova..."
         cordova create build_dir io.veridian.app Veridian --no-update-notifier
         cd build_dir
+        
+        # ¡¡¡EL ORDEN CORRECTO!!!
+        # 1. Añadimos la plataforma. ESTO CREA LA CARPETA 'platforms/android'.
+        cordova platform add android@latest --no-update-notifier
+        
+        # 2. AHORA que la carpeta existe, creamos el archivo de propiedades de Gradle.
+        echo "android.gradle.distributionUrl=https://services.gradle.org/distributions/gradle-8.4-bin.zip" > platforms/android/gradle.properties
+        
+        # 3. Copiamos nuestros archivos de la aplicación.
         rm -rf www
         cp -r ../www .
         cp ../config.xml .
-        
-        # ¡¡¡LA LÍNEA CLAVE!!! Creamos un archivo para forzar la versión de Gradle.
-        echo "android.gradle.distributionUrl=https://services.gradle.org/distributions/gradle-8.4-bin.zip" > platforms/android/gradle.properties
-        
-        cordova platform add android@latest --no-update-notifier
-        echo "✅ PROYECTO CREADO."
+        echo "✅ PROYECTO CREADO Y CONFIGURADO."
         
         echo "--> Construyendo AAB (para Google Play)..."
         cordova build android --release -- -- --bundle
@@ -77,14 +80,13 @@ jobs:
         echo "-------------------------------------------------"
 
         # -------------------------------------------------
-        # PARTE III: LA FIRMA (EL GOLPE DE GRACIA)
+        # PARTE III: LA FIRMA
         # -------------------------------------------------
         echo "--> PARTE III: Buscando y firmando el APK..."
         UNSIGNED_APK_PATH=$(find . -name "app-release-unsigned.apk")
         
         if [ -z "$UNSIGNED_APK_PATH" ]; then
-            echo "❌ ERROR CATASTRÓFICO: ¡No se encontró el APK (app-release-unsigned.apk) después del build!"
-            find ./platforms/android/app/build/outputs -type f
+            echo "❌ ERROR CATASTRÓFICO: ¡No se encontró el APK después del build!"
             exit 1
         fi
         
@@ -94,23 +96,15 @@ jobs:
         SIGNED_APK_FILE="veridian-web-installer.apk"
         KEY_ALIAS="veridian_key"
 
-        echo "--> Creando Keystore (${KEYSTORE_FILE})..."
         keytool -genkey -v -keystore ${KEYSTORE_FILE} -alias ${KEY_ALIAS} -keyalg RSA -keysize 2048 -validity 10000 -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -keypass "${{ secrets.KEY_PASSWORD }}" -dname "CN=Veridian,O=Veridian Corp,C=UY"
         
-        echo "--> Firmando el APK con el alias '${KEY_ALIAS}'..."
-        jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 \
-          -keystore ${KEYSTORE_FILE} \
-          -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-          -keypass "${{ secrets.KEY_PASSWORD }}" \
-          -signedjar ${SIGNED_APK_FILE} \
-          ${UNSIGNED_APK_PATH} \
-          ${KEY_ALIAS}
+        jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore ${KEYSTORE_FILE} -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -keypass "${{ secrets.KEY_PASSWORD }}" -signedjar ${SIGNED_APK_FILE} ${UNSIGNED_APK_PATH} ${KEY_ALIAS}
         
-        echo "✅ FIRMA COMPLETADA. El enemigo ha caído."
+        echo "✅ FIRMA COMPLETADA."
         echo "-------------------------------------------------"
 
     # --------------------------------------------------------------------------
-    # PASO 3: RECOGER EL BOTÍN DE GUERRA
+    # PASO 3: RECOGER EL BOTÍN
     # --------------------------------------------------------------------------
     - name: 🚀 5. Subiendo AAB (para Google Play)...
       uses: actions/upload-artifact@v4
