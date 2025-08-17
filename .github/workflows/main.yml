@@ -1,4 +1,4 @@
-name: Build Veridian (EL MISIL TELEDIRIGIRIDO)
+name: Build Veridian (CON FIRMA AUTOMÁTICA)
 
 on:
   push:
@@ -28,7 +28,18 @@ jobs:
       - name: 'PASO 4: Inyectando la esencia de la IA...'
         run: sed -i 's|const HUGGING_FACE_API_KEY = "";|const HUGGING_FACE_API_KEY = "${{ secrets.HUGGING_FACE_API_KEY }}";|' www/index.html
 
-      - name: 'PASO 5: Creando el archivo de configuración de firma (build.json)...'
+      - name: 'PASO 5: CREANDO LA FIRMA (KEYSTORE) AUTOMÁTICAMENTE...'
+        run: |
+          keytool -genkey -v \
+            -keystore veridian.keystore \
+            -alias ${{ secrets.KEYSTORE_ALIAS }} \
+            -storepass ${{ secrets.KEYSTORE_PASSWORD }} \
+            -keypass ${{ secrets.KEY_PASSWORD }} \
+            -dname "CN=Veridian, OU=Development, O=Veridian AI, L=City, S=State, C=XX" \
+            -keysize 2048 \
+            -validity 10000
+
+      - name: 'PASO 6: Creando el archivo de configuración de firma (build.json)...'
         run: |
           echo '{' > build.json
           echo '  "android": {' >> build.json
@@ -42,18 +53,14 @@ jobs:
           echo '  }' >> build.json
           echo '}' >> build.json
 
-      - name: 'PASO 6: Forjando el molde (Keystore)...'
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > veridian.keystore
-
       - name: 'PASO 7: Montando el chasis de Android...'
         run: cordova platform add android
 
-      - name: 'PASO 8: FORJANDO Y FIRMANDO (EL MISIL TELEDIRIGIDO)...'
-        # ¡AQUÍ ESTÁ LA LÍNEA CLAVE CON LA ARQUITECTURA CORRECTA!
-        run: cordova build android --release -- --packageType=apk --buildConfig=build.json -- -- --arch=arm64-v8a
+      - name: 'PASO 8: FORJANDO Y FIRMANDO EL APK...'
+        run: cordova build android --release -- --packageType=apk --buildConfig=build.json
 
-      - name: 'PASO 9: Recogiendo el acero templado (Subiendo el APK)...'
+      - name: 'PASO 9: Recogiendo el APK Firmado...'
         uses: actions/upload-artifact@v4
         with:
-          name: Veridian-APK-Firmado
-          path: platforms/android/app/build/outputs/apk/release/*.apk
+          name: Veridian-APK-Firmado-Automatico
+          path: platforms/android/app/build/outputs/apk/release/app-release.apk
