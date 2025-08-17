@@ -1,4 +1,4 @@
-name: Build Veridian (Sin Mentiras)
+name: Build Veridian (El Golpe de Gracia)
 
 on:
   push:
@@ -13,52 +13,43 @@ jobs:
       - name: 'PASO 1: Checkout del código'
         uses: actions/checkout@v4
 
-      - name: 'PASO 2: Configurando Java (JDK 17)'
+      - name: 'PASO 2: Configurando Java y Node.js'
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-
-      - name: 'PASO 3: Configurando Node.js (v18)'
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '18'
 
-      - name: 'PASO 4: Instalando Cordova'
+      - name: 'PASO 3: Instalando Cordova'
         run: npm install -g cordova
 
-      - name: 'PASO 5: Inyectando la clave secreta de la IA'
+      - name: 'PASO 4: Inyectando la clave secreta de la IA'
         run: sed -i 's|const HUGGING_FACE_API_KEY = "";|const HUGGING_FACE_API_KEY = "${{ secrets.HUGGING_FACE_API_KEY }}";|' www/index.html
 
-      - name: 'PASO 6: Añadiendo plataforma Android'
-        run: cordova platform add android
-
-      - name: 'PASO 7: Construyendo el APK'
-        run: cordova build android --release -- -- --packageType=apk
-
-      - name: 'PASO 8: Creando el Keystore'
+      - name: 'PASO 5: Creando el archivo de configuración de firma (build.json)'
         run: |
-          keytool -genkey -v -keystore veridian-release-key.keystore \
-          -alias ${{ secrets.KEYSTORE_ALIAS }} \
-          -keyalg RSA -keysize 2048 -validity 10000 \
-          -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-          -keypass "${{ secrets.KEY_PASSWORD }}" \
-          -dname "CN=Veridian, OU=AI, O=Veridian Corp, L=Montevideo, S=Uruguay, C=UY"
+          echo '{' > build.json
+          echo '  "android": {' >> build.json
+          echo '    "release": {' >> build.json
+          echo '      "keystore": "veridian.keystore",' >> build.json
+          echo '      "storePassword": "${{ secrets.KEYSTORE_PASSWORD }}",' >> build.json
+          echo '      "alias": "${{ secrets.KEYSTORE_ALIAS }}",' >> build.json
+          echo '      "password": "${{ secrets.KEY_PASSWORD }}",' >> build.json
+          echo '      "keystoreType": "JKS"' >> build.json
+          echo '    }' >> build.json
+          echo '  }' >> build.json
+          echo '}' >> build.json
 
-      - name: 'PASO 9: Firmando el APK'
-        run: |
-          jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 \
-          -keystore veridian-release-key.keystore \
-          -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-          -keypass "${{ secrets.KEY_PASSWORD }}" \
-          platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk \
-          ${{ secrets.KEYSTORE_ALIAS }}
+      - name: 'PASO 6: Creando el Keystore desde el secreto'
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > veridian.keystore
 
-      - name: 'PASO 10: Renombrando y preparando para la subida'
-        run: mv platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk veridian-final.apk
+      - name: 'PASO 7: Construyendo y Firmando el APK (El Golpe de Gracia)'
+        run: cordova build android --release -- --packageType=apk --buildConfig=build.json
 
-      - name: 'PASO 11: Subiendo el APK'
+      - name: 'PASO 8: Subiendo el APK Firmado'
         uses: actions/upload-artifact@v4
         with:
           name: Veridian-APK
-          path: veridian-final.apk
+          path: platforms/android/app/build/outputs/apk/release/app-release.apk
