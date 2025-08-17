@@ -1,4 +1,4 @@
-name: Build Veridian (EL DESFILE DE LA VICTORIA)
+name: Build Veridian (EL MISIL TELEDIRIGIRIDO)
 
 on:
   push:
@@ -48,12 +48,12 @@ jobs:
       - name: 'PASO 7: Montando el chasis de Android...'
         run: cordova platform add android
 
-      - name: 'PASO 8: FORJANDO Y FIRMANDO EL PUTO APK...'
-        run: cordova build android --release -- --packageType=apk --buildConfig=build.json
+      - name: 'PASO 8: FORJANDO Y FIRMANDO (EL MISIL TELEDIRIGIDO)...'
+        # ¡AQUÍ ESTÁ LA LÍNEA CLAVE CON LA ARQUITECTURA CORRECTA!
+        run: cordova build android --release -- --packageType=apk --buildConfig=build.json -- -- --arch=arm64-v8a
 
       - name: 'PASO 9: Recogiendo el acero templado (Subiendo el APK)...'
         uses: actions/upload-artifact@v4
         with:
           name: Veridian-APK-Firmado
-          # ¡AQUÍ ESTÁ LA CORRECCIÓN! ¡BUSCA CUALQUIER .apk!
           path: platforms/android/app/build/outputs/apk/release/*.apk
