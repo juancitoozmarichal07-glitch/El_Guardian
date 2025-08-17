@@ -1,4 +1,4 @@
-name: Build Veridian (El Golpe de Gracia)
+name: Build Veridian (LA FORJA FINAL)
 
 on:
   push:
@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 'PASO 1: Checkout del código'
+      - name: 'PASO 1: Abriendo la forja...'
         uses: actions/checkout@v4
 
-      - name: 'PASO 2: Configurando Java y Node.js'
+      - name: 'PASO 2: Encendiendo los hornos (Java y Node.js)...'
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -22,13 +22,13 @@ jobs:
         with:
           node-version: '18'
 
-      - name: 'PASO 3: Instalando Cordova'
+      - name: 'PASO 3: Trayendo las herramientas (Cordova)...'
         run: npm install -g cordova
 
-      - name: 'PASO 4: Inyectando la clave secreta de la IA'
+      - name: 'PASO 4: Inyectando la esencia de la IA...'
         run: sed -i 's|const HUGGING_FACE_API_KEY = "";|const HUGGING_FACE_API_KEY = "${{ secrets.HUGGING_FACE_API_KEY }}";|' www/index.html
 
-      - name: 'PASO 5: Creando el archivo de configuración de firma (build.json)'
+      - name: 'PASO 5: Creando el archivo de configuración de firma (build.json)...'
         run: |
           echo '{' > build.json
           echo '  "android": {' >> build.json
@@ -42,14 +42,17 @@ jobs:
           echo '  }' >> build.json
           echo '}' >> build.json
 
-      - name: 'PASO 6: Creando el Keystore desde el secreto'
+      - name: 'PASO 6: Forjando el molde (Keystore)...'
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > veridian.keystore
 
-      - name: 'PASO 7: Construyendo y Firmando el APK (El Golpe de Gracia)'
+      - name: 'PASO 7: Montando el chasis de Android...' # <-- ¡¡EL PASO QUE FALTABA!!
+        run: cordova platform add android
+
+      - name: 'PASO 8: FORJANDO Y FIRMANDO EL PUTO APK...'
         run: cordova build android --release -- --packageType=apk --buildConfig=build.json
 
-      - name: 'PASO 8: Subiendo el APK Firmado'
+      - name: 'PASO 9: Recogiendo el acero templado (Subiendo el APK)...'
         uses: actions/upload-artifact@v4
         with:
-          name: Veridian-APK
+          name: Veridian-APK-Firmado
           path: platforms/android/app/build/outputs/apk/release/app-release.apk
