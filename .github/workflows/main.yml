@@ -1,4 +1,4 @@
-name: Build Veridian APK
+name: Build Veridian APK (Construcción Limpia)
 
 on:
   push:
@@ -11,10 +11,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # Actualizado a v4 para consistencia
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4 # Actualizado a v4
         with:
           node-version: '18'
 
@@ -25,7 +25,8 @@ jobs:
         run: cordova create temp_build com.veridian.app Veridian
 
       - name: Inject API Key
-        run: sed -i "s|const HUGGING_FACE_API_KEY = \"\";|const HUGGING_FACE_API_KEY = \"${{ secrets.HF_API_KEY }}\";|g" index.html
+        # CORRECCIÓN: Usando el nombre correcto del secreto
+        run: sed -i 's|const HUGGING_FACE_API_KEY = "";|const HUGGING_FACE_API_KEY = "${{ secrets.HUGGING_FACE_API_KEY }}";|g' index.html
 
       - name: Move HTML to www folder
         run: mv index.html temp_build/www/index.html
@@ -36,10 +37,10 @@ jobs:
 
       - name: Build Android App
         working-directory: ./temp_build
-        run: cordova build android
+        run: cordova build android # Esto crea un APK de depuración
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Veridian-APK
+          name: Veridian-APK-Debug
           path: temp_build/platforms/android/app/build/outputs/apk/debug/app-debug.apk
