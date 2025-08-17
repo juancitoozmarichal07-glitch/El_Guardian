@@ -1,4 +1,4 @@
-name: Build Veridian (FIRMA MANUAL BRUTA)
+name: Build Veridian APK
 
 on:
   push:
@@ -10,65 +10,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 'PASO 1: Abriendo la forja...'
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      - name: 'PASO 2: Encendiendo los hornos (Java y Node.js)...'
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
           node-version: '18'
 
-      - name: 'PASO 3: Trayendo las herramientas (Cordova)...'
+      - name: Install Cordova
         run: npm install -g cordova
 
-      - name: 'PASO 4: Inyectando la esencia de la IA...'
-        run: sed -i 's|const HUGGING_FACE_API_KEY = "";|const HUGGING_FACE_API_KEY = "${{ secrets.HUGGING_FACE_API_KEY }}";|' www/index.html
+      - name: Create Cordova Project
+        run: cordova create temp_build com.veridian.app Veridian
 
-      - name: 'PASO 5: CREANDO LA FIRMA (KEYSTORE) AUTOMÁTICAMENTE...'
-        run: |
-          keytool -genkey -v \
-            -keystore veridian.keystore \
-            -alias ${{ secrets.KEYSTORE_ALIAS }} \
-            -storepass ${{ secrets.KEYSTORE_PASSWORD }} \
-            -keypass ${{ secrets.KEY_PASSWORD }} \
-            -dname "CN=Veridian, OU=Development, O=Veridian AI, L=City, S=State, C=XX" \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000
+      - name: Inject API Key
+        run: sed -i "s|const HUGGING_FACE_API_KEY = \"\";|const HUGGING_FACE_API_KEY = \"${{ secrets.HF_API_KEY }}\";|g" index.html
 
-      - name: 'PASO 6: Montando el chasis de Android...'
+      - name: Move HTML to www folder
+        run: mv index.html temp_build/www/index.html
+
+      - name: Add Android Platform
+        working-directory: ./temp_build
         run: cordova platform add android
 
-      # --- ¡AQUÍ ESTÁ EL GRAN CAMBIO! ---
-      - name: 'PASO 7: FORJANDO EL APK (SIN FIRMAR)...'
-        # Construimos un APK de release, pero sin intentar firmarlo con build.json
-        run: cordova build android --release
+      - name: Build Android App
+        working-directory: ./temp_build
+        run: cordova build android
 
-      - name: 'PASO 8: FIRMANDO EL APK A MANO (EL MAZO)...'
-        # Usamos jarsigner, la herramienta directa de Java, para firmar el APK sin firmar.
-        run: |
-          jarsigner -verbose \
-            -sigalg SHA1withRSA \
-            -digestalg SHA1 \
-            -keystore veridian.keystore \
-            -storepass ${{ secrets.KEYSTORE_PASSWORD }} \
-            -keypass ${{ secrets.KEY_PASSWORD }} \
-            platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk \
-            ${{ secrets.KEYSTORE_ALIAS }}
-
-      - name: 'PASO 9: OPTIMIZANDO EL APK FINAL (ZIPALIGN)...'
-        # zipalign es un paso obligatorio después de firmar a mano.
-        run: |
-          $ANDROID_SDK_ROOT/build-tools/*/zipalign -v 4 \
-            platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk \
-            veridian-final.apk
-
-      - name: 'PASO 10: Recogiendo el APK Final...'
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Veridian-APK-FIRMADO-A-MANO
-          path: veridian-final.apk
+          name: Veridian-APK
+          path: temp_build/platforms/android/app/build/outputs/apk/debug/app-debug.apk
