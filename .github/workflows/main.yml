@@ -1,4 +1,4 @@
-name: Build Veridian (CORRECCIÓN FINAL)
+name: Build Veridian (LIMPIEZA FORZADA)
 
 on:
   push:
@@ -12,6 +12,13 @@ jobs:
     steps:
       - name: 'PASO 1: Abriendo la forja...'
         uses: actions/checkout@v4
+
+      # --- ¡AQUÍ ESTÁ EL NUEVO PASO DE LIMPIEZA! ---
+      - name: 'PASO 1.5: Limpiando la forja (Borrando archivos viejos)...'
+        run: |
+          rm -f veridian.keystore
+          rm -f build.json
+          echo "Archivos de construcción anteriores eliminados."
 
       - name: 'PASO 2: Encendiendo los hornos (Java y Node.js)...'
         uses: actions/setup-java@v4
@@ -63,5 +70,5 @@ jobs:
       - name: 'PASO 9: Recogiendo el APK Firmado...'
         uses: actions/upload-artifact@v4
         with:
-          name: Veridian-APK-Firmado-CORREGIDO
+          name: Veridian-APK-LIMPIEZA-FORZADA
           path: platforms/android/app/build/outputs/apk/release/app-release.apk
