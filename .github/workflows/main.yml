@@ -1,4 +1,4 @@
-name: Build Veridian (CON FIRMA AUTOMÁTICA)
+name: Build Veridian (CORRECCIÓN FINAL)
 
 on:
   push:
@@ -28,7 +28,7 @@ jobs:
       - name: 'PASO 4: Inyectando la esencia de la IA...'
         run: sed -i 's|const HUGGING_FACE_API_KEY = "";|const HUGGING_FACE_API_KEY = "${{ secrets.HUGGING_FACE_API_KEY }}";|' www/index.html
 
-      - name: 'PASO 5: CREANDO LA FIRMA (KEYSTORE) AUTOMÁTICAMENTE...'
+      - name: 'PASO 5: CREANDO LA FIRMA (KEYSTORE) - CORREGIDO'
         run: |
           keytool -genkey -v \
             -keystore veridian.keystore \
@@ -36,6 +36,7 @@ jobs:
             -storepass ${{ secrets.KEYSTORE_PASSWORD }} \
             -keypass ${{ secrets.KEY_PASSWORD }} \
             -dname "CN=Veridian, OU=Development, O=Veridian AI, L=City, S=State, C=XX" \
+            -keyalg RSA \
             -keysize 2048 \
             -validity 10000
 
@@ -62,5 +63,5 @@ jobs:
       - name: 'PASO 9: Recogiendo el APK Firmado...'
         uses: actions/upload-artifact@v4
         with:
-          name: Veridian-APK-Firmado-Automatico
+          name: Veridian-APK-Firmado-CORREGIDO
           path: platforms/android/app/build/outputs/apk/release/app-release.apk
