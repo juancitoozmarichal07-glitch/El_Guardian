@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Veridian</title>
+    <title>Banco de Pruebas - API Meta/HF</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
         body {
@@ -95,18 +95,27 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- VARIABLES DE CONFIGURACIÓN ---
-            const HUGGING_FACE_API_KEY = ""; // Esta línea será reemplazada por el robot
+            // --- MODIFICACIÓN CLAVE PARA LA PRUEBA ---
+            // Pega tu clave de Hugging Face directamente aquí.
+            const HUGGING_FACE_API_KEY = "AQUÍ_VA_TU_CLAVE_DE_HUGGING_FACE"; 
+            
             const botonPulir = document.getElementById('boton-pulir');
             const textoEntrada = document.getElementById('texto-entrada');
             const textoSalida = document.getElementById('texto-salida');
 
             // --- FUNCIÓN PRINCIPAL DE LA NAVE ESPACIAL ---
             async function llamarFormula1(texto) {
+                // La URL ya apunta al modelo correcto que tienes aprobado. ¡Perfecto!
                 const API_URL = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-70B-Instruct";
                 const prompt = `Eres un asistente de escritura experto. Corrige el siguiente texto. Devuelve solo el texto corregido.\n\nOriginal: "${texto}"\n\nCorregido:`;
                 
                 textoSalida.textContent = "Procesando con el motor de Fórmula 1...";
+
+                // Verificación de seguridad: no llamar a la API si la clave está vacía
+                if (HUGGING_FACE_API_KEY === "" || HUGGING_FACE_API_KEY === "AQUÍ_VA_TU_CLAVE_DE_HUGGING_FACE") {
+                    textoSalida.textContent = "Error: La clave de la API no ha sido introducida en el código.";
+                    return;
+                }
 
                 try {
                     const response = await fetch(API_URL, {
