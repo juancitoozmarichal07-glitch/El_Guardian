@@ -1,4 +1,4 @@
-name: Build Veridian (LA FORJA FINAL)
+name: Build Veridian (EL DESFILE DE LA VICTORIA)
 
 on:
   push:
@@ -45,7 +45,7 @@ jobs:
       - name: 'PASO 6: Forjando el molde (Keystore)...'
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > veridian.keystore
 
-      - name: 'PASO 7: Montando el chasis de Android...' # <-- ¡¡EL PASO QUE FALTABA!!
+      - name: 'PASO 7: Montando el chasis de Android...'
         run: cordova platform add android
 
       - name: 'PASO 8: FORJANDO Y FIRMANDO EL PUTO APK...'
@@ -55,4 +55,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Veridian-APK-Firmado
-          path: platforms/android/app/build/outputs/apk/release/app-release.apk
+          # ¡AQUÍ ESTÁ LA CORRECCIÓN! ¡BUSCA CUALQUIER .apk!
+          path: platforms/android/app/build/outputs/apk/release/*.apk
