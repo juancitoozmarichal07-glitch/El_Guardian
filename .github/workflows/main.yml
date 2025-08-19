@@ -1,4 +1,4 @@
-name: Build Guardian (APK DEPURACIÓN)
+name: Build Guardian APK
 
 on:
   push:
@@ -25,15 +25,13 @@ jobs:
       - name: 'PASO 3: Instalando Cordova...'
         run: npm install -g cordova
 
-      # PASO 4 FUE ELIMINADO PORQUE NO ES NECESARIO PARA EL GUARDIÁN
-
-      - name: 'PASO 5: Añadiendo la plataforma Android...'
+      - name: 'PASO 4: Añadiendo la plataforma Android...'
         run: cordova platform add android
 
-      - name: 'PASO 6: CONSTRUYENDO EL APK DE DEPURACIÓN...'
+      - name: 'PASO 5: CONSTRUYENDO EL APK DE DEPURACIÓN...'
         run: cordova build android --debug
 
-      - name: 'PASO 7: Subiendo el APK de Depuración...'
+      - name: 'PASO 6: Subiendo el APK de Depuración...'
         uses: actions/upload-artifact@v4
         with:
           name: Guardian-APK-Debug
