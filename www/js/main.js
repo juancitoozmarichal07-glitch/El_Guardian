@@ -1,66 +1,42 @@
-// --- LÓGICA VISUAL (SE EJECUTA INMEDIATAMENTE) ---
+document.addEventListener('deviceready', onDeviceReady, false);
 
-// Espera a que el contenido de la página esté cargado para encontrar los elementos.
-document.addEventListener('DOMContentLoaded', (event) => {
-    console.log('DOM cargado. Inicializando interfaz...');
+function onDeviceReady() {
+    console.log('Running cordova-' + cordova.platformId + '@' + cordova.version);
+    console.log('Dispositivo listo. Guardián operativo.');
 
     const chatBox = document.getElementById('chat-box');
     const userInput = document.getElementById('user-input');
     const sendButton = document.getElementById('send-button');
 
-    // Comprobamos que los elementos existen antes de usarlos
-    if (!chatBox || !userInput || !sendButton) {
-        console.error('Error crítico: No se encontraron los elementos de la interfaz.');
-        alert('Error crítico: La interfaz no se pudo cargar.');
-        return;
-    }
-
     let chatHistory = [];
 
-    // --- LÓGICA DE MEMORIA (ESPERA AL DISPOSITIVO) ---
-
-    // Escuchamos el evento 'deviceready' para la lógica de plugins
-    document.addEventListener('deviceready', onDeviceReady, false);
-
-    function onDeviceReady() {
-        console.log('Dispositivo listo. Intentando cargar historial...');
-        loadHistory();
-    }
-
     function loadHistory() {
-        // Usamos un try/catch para asegurarnos de que si NativeStorage no existe, no se rompa todo
-        try {
-            NativeStorage.getItem('chat_history', (history) => {
-                if (history && history.length > 0) {
-                    chatHistory = history;
-                    // Limpiamos el chat antes de cargar el historial para evitar duplicados
-                    chatBox.innerHTML = ''; 
-                    chatHistory.forEach(msg => addMessage(msg.text, msg.sender));
-                    console.log('Historial cargado con éxito.');
-                }
-            }, (error) => {
-                // Si no hay historial, no hacemos nada, ya se mostró el saludo inicial
-                console.log('No se encontró historial, se mantiene el saludo inicial.');
-            });
-        } catch (e) {
-            console.error('NativeStorage no está disponible. La memoria no funcionará.', e);
-            // Opcional: Mostrar un mensaje al usuario
-            // addMessage('Guardián: Advertencia, la memoria persistente ha fallado.', 'guardian-message');
-        }
+        NativeStorage.getItem('chat_history', (history) => {
+            if (history && history.length > 0) {
+                chatHistory = history;
+                chatHistory.forEach(msg => addMessage(msg.text, msg.sender));
+            } else {
+                initializeChat();
+            }
+        }, (error) => {
+            console.log('No se encontró historial, inicializando chat.');
+            initializeChat();
+        });
     }
 
     function saveHistory() {
-        try {
-            NativeStorage.setItem('chat_history', chatHistory, 
-                () => console.log('Historial guardado.'),
-                (error) => console.error('Error al guardar historial:', error)
-            );
-        } catch (e) {
-            console.error('NativeStorage no está disponible. No se puede guardar.', e);
-        }
+        NativeStorage.setItem('chat_history', chatHistory, 
+            () => console.log('Historial guardado.'),
+            (error) => console.error('Error al guardar historial:', error)
+        );
     }
 
-    // --- LÓGICA DE INTERACCIÓN (COMÚN A AMBOS) ---
+    function initializeChat() {
+        const firstMessage = "Guardián: Estoy listo. Define tu próximo contrato.";
+        addMessage(firstMessage, 'guardian-message');
+        chatHistory.push({ text: firstMessage, sender: 'guardian-message' });
+        saveHistory();
+    }
 
     sendButton.addEventListener('click', handleUserInput);
     userInput.addEventListener('keypress', function(e) {
@@ -105,11 +81,9 @@ document.addEventListener('DOMContentLoaded', (event) => {
         
         addMessage(responseText, 'guardian-message');
         chatHistory.push({ text: responseText, sender: 'guardian-message' });
+        saveHistory();
     }
 
-    // --- SALUDO INICIAL (SE MUESTRA SIEMPRE AL PRINCIPIO) ---
-    const firstMessage = "Guardián: Estoy listo. Define tu próximo contrato.";
-    addMessage(firstMessage, 'guardian-message');
-    chatHistory.push({ text: firstMessage, sender: 'guardian-message' });
-    
-});
+    // --- PUNTO DE ENTRADA ---
+    loadHistory();
+}
