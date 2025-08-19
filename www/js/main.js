@@ -1,75 +1,93 @@
-// Espera a que el dispositivo esté listo para usar las funciones de Cordova
+// Espera a que el dispositivo esté listo para usar los plugins de Cordova
 document.addEventListener('deviceready', onDeviceReady, false);
 
 function onDeviceReady() {
-    // Elementos de la interfaz
-    const commandInput = document.getElementById('command-input');
-    const sendButton = document.getElementById('send-button');
-    
-    // Mensaje de bienvenida del Guardián
-    addMessage("Guardián: Estoy listo. Define tu próximo contrato.", 'guardian-message');
+    console.log('Dispositivo listo. Guardián operativo.');
 
-    // Asignar eventos
-    sendButton.addEventListener('click', handleSendCommand);
-    commandInput.addEventListener('keypress', function(e) {
-        // Permitir enviar con la tecla "Enter" del teclado
+    const chatBox = document.getElementById('chat-box');
+    const userInput = document.getElementById('user-input');
+    const sendButton = document.getElementById('send-button');
+
+    let chatHistory = [];
+
+    // --- NUEVA FUNCIÓN PARA CARGAR EL HISTORIAL ---
+    function loadHistory() {
+        NativeStorage.getItem('chat_history', (history) => {
+            if (history && history.length > 0) {
+                chatHistory = history;
+                chatHistory.forEach(msg => addMessage(msg.text, msg.sender));
+                console.log('Historial cargado.');
+            } else {
+                // Si no hay historial, muestra el saludo inicial
+                const firstMessage = "Guardián: Estoy listo. Define tu próximo contrato.";
+                addMessage(firstMessage, 'guardian-message');
+                chatHistory.push({ text: firstMessage, sender: 'guardian-message' });
+                saveHistory();
+            }
+        }, (error) => {
+            // Si hay un error (ej. es la primera vez), empieza de cero
+            console.log('No se encontró historial, empezando de nuevo.');
+            const firstMessage = "Guardián: Estoy listo. Define tu próximo contrato.";
+            addMessage(firstMessage, 'guardian-message');
+            chatHistory.push({ text: firstMessage, sender: 'guardian-message' });
+            saveHistory();
+        });
+    }
+
+    // --- NUEVA FUNCIÓN PARA GUARDAR EL HISTORIAL ---
+    function saveHistory() {
+        NativeStorage.setItem('chat_history', chatHistory, () => {
+            console.log('Historial guardado.');
+        }, (error) => {
+            console.error('Error al guardar el historial: ', error);
+        });
+    }
+
+    // --- CARGAMOS EL HISTORIAL AL INICIAR ---
+    loadHistory();
+
+    sendButton.addEventListener('click', handleUserInput);
+    userInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
-            handleSendCommand();
+            handleUserInput();
         }
     });
-}
 
-function handleSendCommand() {
-    const input = document.getElementById('command-input');
-    const commandText = input.value.trim();
+    function handleUserInput() {
+        const userText = userInput.value.trim();
+        if (userText === "") return;
 
-    // No hacer nada si el input está vacío
-    if (commandText === '') return;
-
-    // Mostrar el mensaje del usuario en el chat
-    addMessage(`Tú: ${commandText}`, 'user-message');
-    // Enviar el comando al intérprete
-    interpretCommand(commandText);
-    
-    // Limpiar el campo de texto y mantener el foco
-    input.value = '';
-    input.focus();
-}
-
-function addMessage(text, type) {
-    const container = document.getElementById('chat-container');
-    const msgDiv = document.createElement('div');
-    msgDiv.className = `message ${type}`;
-    msgDiv.textContent = text;
-    container.appendChild(msgDiv);
-    
-    // Pequeño truco para asegurar que el scroll baje después de que el DOM se actualice
-    setTimeout(() => {
-        container.scrollTop = container.scrollHeight;
-    }, 0);
-}
-
-function interpretCommand(command) {
-    const normalized = command.toLowerCase();
-    // Expresión regular para encontrar números seguidos de "min", "minuto", "hora", etc.
-    const durationRegex = /(\d+)\s*(min|minuto|minutos|hora|horas)/;
-    const match = normalized.match(durationRegex);
-
-    if (match) {
-        // Si se encuentra una duración
-        const value = parseInt(match[1], 10);
-        const unit = match[2];
-        // Convertir todo a minutos
-        const duration = unit.startsWith('h') ? value * 60 : value;
-        // La tarea es el resto del texto, limpiando la duración y espacios extra
-        const task = normalized.replace(durationRegex, '').replace(/por$/, '').trim();
+        addMessage(`Tú: ${userText}`, 'user-message');
+        chatHistory.push({ text: `Tú: ${userText}`, sender: 'user-message' });
         
-        const taskName = task.length > 0 ? `'${task}'` : 'una tarea';
+        processCommand(userText);
 
-        addMessage(`Guardián: Contrato aceptado. Tarea: ${taskName}. Duración: ${duration} minutos. El tiempo empieza ahora.`, 'guardian-message');
-        // Futuro: Aquí iniciaremos el temporizador con un plugin nativo.
-    } else {
-        // Si no se encuentra una duración
-        addMessage("Guardián: No he reconocido una duración. Ejemplo: 'Leer sobre IA por 30 minutos'.", 'guardian-message');
+        userInput.value = "";
+        saveHistory(); // Guardamos después de cada interacción
+    }
+
+    function addMessage(message, senderClass) {
+        const messageElement = document.createElement('div');
+        messageElement.className = `chat-message ${senderClass}`;
+        messageElement.textContent = message;
+        chatBox.appendChild(messageElement);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function processCommand(command) {
+        const durationMatch = command.match(/(\d+)\s*(minutos|min|m)/i);
+        let responseText = "";
+
+        if (durationMatch) {
+            const duration = parseInt(durationMatch[1], 10);
+            const task = command.replace(durationMatch[0], '').trim();
+            responseText = `Guardián: Contrato aceptado. Tarea: '${task}'. Duración: ${duration} minutos. El tiempo empieza ahora.`;
+        } else {
+            responseText = "Guardián: No he reconocido una duración. Ejemplo: 'Leer sobre IA por 30 minutos'.";
+        }
+        
+        addMessage(responseText, 'guardian-message');
+        chatHistory.push({ text: responseText, sender: 'guardian-message' });
+        saveHistory(); // Guardamos también la respuesta del Guardián
     }
 }
