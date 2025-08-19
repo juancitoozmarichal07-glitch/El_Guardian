@@ -13,4 +13,9 @@
     <allow-intent href="https://*/*" />
     <preference name="DisallowOverscroll" value="true" />
     <preference name="android-build-tool" value="gradle" />
+
+    <!-- MEMORIA DEL GUARDIÁN: AÑADIDO EL PLUGIN DE ALMACENAMIENTO NATIVO -->
+    <preference name="AndroidXEnabled" value="true" />
+    <plugin name="cordova-plugin-nativestorage" spec="2.3.2" />
+
 </widget>
