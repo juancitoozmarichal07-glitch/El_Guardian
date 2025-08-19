@@ -7,20 +7,26 @@ function onDeviceReady() {
     const userInput = document.getElementById('user-input');
     const sendButton = document.getElementById('send-button');
 
-    // --- NUESTRA BASE DE DATOS EN MEMORIA ---
+    // --- NUESTRA BASE DE DATOS EVOLUCIONADA ---
     let guardianData = {
         chat_history: [],
-        reinos: []
+        reinos: [], // Ahora es un array de objetos complejos
+        activeContext: { // Para saber dónde estamos trabajando
+            reino: null,
+            templo: null
+        }
     };
 
-    // --- LÓGICA DE ALMACENAMIENTO MEJORADA ---
+    // --- LÓGICA DE ALMACENAMIENTO ---
     function loadData() {
-        NativeStorage.getItem('guardian_data', (data) => {
+        // Usamos window.NativeStorage para ser explícitos
+        window.NativeStorage.getItem('guardian_data', (data) => {
             if (data) {
                 guardianData = data;
-                // Asegurarse de que las propiedades existan para evitar errores
+                // Asegurarse de que las propiedades existan para evitar errores tras una actualización
                 if (!guardianData.chat_history) guardianData.chat_history = [];
                 if (!guardianData.reinos) guardianData.reinos = [];
+                if (!guardianData.activeContext) guardianData.activeContext = { reino: null, templo: null };
 
                 // Cargar historial de chat
                 if (guardianData.chat_history.length > 0) {
@@ -38,7 +44,7 @@ function onDeviceReady() {
     }
 
     function saveData() {
-        NativeStorage.setItem('guardian_data', guardianData,
+        window.NativeStorage.setItem('guardian_data', guardianData,
             () => console.log('Datos del Guardián guardados.'),
             (error) => console.error('Error al guardar datos:', error)
         );
@@ -51,7 +57,7 @@ function onDeviceReady() {
         saveData();
     }
 
-    // --- LÓGICA DE INTERACCIÓN (SIN CAMBIOS) ---
+    // --- LÓGICA DE INTERACCIÓN ---
     sendButton.addEventListener('click', handleUserInput);
     userInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
@@ -63,64 +69,161 @@ function onDeviceReady() {
         const userText = userInput.value.trim();
         if (userText === "") return;
 
-        const userMessage = `Tú: ${userText}`;
-        addMessage(userMessage, 'user-message');
-        guardianData.chat_history.push({ text: userMessage, sender: 'user-message' });
+        // Añadimos el prefijo "Tú:" para consistencia visual
+        const userMessageText = `Tú: ${userText}`;
+        addMessage(userMessageText, 'user-message');
+        guardianData.chat_history.push({ text: userMessageText, sender: 'user-message' });
         
-        processCommand(userText); // El procesador de comandos ahora es más inteligente
+        processCommand(userText);
 
         userInput.value = "";
-        // No guardamos aquí, se guarda dentro de processCommand para asegurar consistencia
     }
 
     function addMessage(message, senderClass) {
         const messageElement = document.createElement('div');
         messageElement.className = `chat-message ${senderClass}`;
-        messageElement.textContent = message;
+        // Usamos innerText para prevenir problemas de formato con los saltos de línea
+        messageElement.innerText = message;
         chatBox.appendChild(messageElement);
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    // --- PROCESADOR DE COMANDOS MEJORADO (EL NUEVO CEREBRO) ---
+    // --- PROCESADOR DE COMANDOS (EL CEREBRO DEL GUARDIÁN) ---
     function processCommand(command) {
         let responseText = "";
-        command = command.toLowerCase(); // Convertimos a minúsculas para facilitar la detección
+        const lowerCaseCommand = command.toLowerCase();
 
         // Comando: crear reino [nombre]
-        if (command.startsWith('crear reino ')) {
+        if (lowerCaseCommand.startsWith('crear reino ')) {
             const reinoName = command.substring(12).trim();
-            if (reinoName && !guardianData.reinos.includes(reinoName)) {
-                guardianData.reinos.push(reinoName);
+            const reinoExists = guardianData.reinos.some(reino => reino.name.toLowerCase() === reinoName.toLowerCase());
+
+            if (reinoName && !reinoExists) {
+                const nuevoReino = {
+                    name: reinoName,
+                    templos: []
+                };
+                guardianData.reinos.push(nuevoReino);
                 responseText = `Guardián: Reino "${reinoName}" creado con éxito. Tu universo se expande.`;
-            } else if (guardianData.reinos.includes(reinoName)) {
+            } else if (reinoExists) {
                 responseText = `Guardián: El Reino "${reinoName}" ya existe. Elige otro nombre.`;
             } else {
                 responseText = "Guardián: Comando inválido. Usa: crear reino [nombre del reino].";
             }
         
         // Comando: listar reinos
-        } else if (command.trim() === 'listar reinos') {
+        } else if (lowerCaseCommand.trim() === 'listar reinos') {
             if (guardianData.reinos.length > 0) {
-                responseText = "Guardián: Estos son tus Reinos actuales:\n- " + guardianData.reinos.join('\n- ');
+                const reinoNames = guardianData.reinos.map(reino => reino.name);
+                responseText = "Guardián: Estos son tus Reinos actuales:\n- " + reinoNames.join('\n- ');
             } else {
-                responseText = "Guardián: Aún no has creado ningún Reino. Tu universo espera ser definido. Usa 'crear reino [nombre]'.";
+                responseText = "Guardián: Aún no has creado ningún Reino. Usa 'crear reino [nombre]'.";
             }
 
-        // Comando: contrato de duración (como antes)
+        // Comando: crear templo [nombreTemplo] en [nombreReino]
+        } else if (lowerCaseCommand.startsWith('crear templo ')) {
+            const match = command.match(/crear templo (.*) en (.*)/i);
+            if (match) {
+                const temploName = match[1].trim();
+                const reinoName = match[2].trim();
+                const reinoTarget = guardianData.reinos.find(r => r.name.toLowerCase() === reinoName.toLowerCase());
+
+                if (reinoTarget) {
+                    const temploExists = reinoTarget.templos.some(t => t.name.toLowerCase() === temploName.toLowerCase());
+                    if (!temploExists) {
+                        const nuevoTemplo = {
+                            name: temploName,
+                            level: 1,
+                            contracts: []
+                        };
+                        reinoTarget.templos.push(nuevoTemplo);
+                        responseText = `Guardián: Templo "${temploName}" erigido con éxito en el Reino de "${reinoName}".`;
+                    } else {
+                        responseText = `Guardián: El Templo "${temploName}" ya existe en el Reino de "${reinoName}".`;
+                    }
+                } else {
+                    responseText = `Guardián: No se encontró el Reino "${reinoName}".`;
+                }
+            } else {
+                responseText = "Guardián: Comando inválido. Usa: crear templo [nombre] en [reino].";
+            }
+
+        // Comando: listar templos en [nombreReino]
+        } else if (lowerCaseCommand.startsWith('listar templos en ')) {
+            const reinoName = command.substring(18).trim();
+            const reinoTarget = guardianData.reinos.find(r => r.name.toLowerCase() === reinoName.toLowerCase());
+
+            if (reinoTarget) {
+                if (reinoTarget.templos.length > 0) {
+                    const temploNames = reinoTarget.templos.map(t => `${t.name} (Nivel ${t.level})`);
+                    responseText = `Guardián: Los Templos en el Reino de "${reinoName}" son:\n- ` + temploNames.join('\n- ');
+                } else {
+                    responseText = `Guardián: El Reino de "${reinoName}" aún no tiene Templos.`;
+                }
+            } else {
+                responseText = `Guardián: No se encontró el Reino "${reinoName}".`;
+            }
+            
+        // Comando: entrar en templo [nombreTemplo] de [nombreReino]
+        } else if (lowerCaseCommand.startsWith('entrar en templo ')) {
+            const match = command.match(/entrar en templo (.*) de (.*)/i);
+            if (match) {
+                const temploName = match[1].trim();
+                const reinoName = match[2].trim();
+                const reinoTarget = guardianData.reinos.find(r => r.name.toLowerCase() === reinoName.toLowerCase());
+
+                if (reinoTarget) {
+                    const temploTarget = reinoTarget.templos.find(t => t.name.toLowerCase() === temploName.toLowerCase());
+                    if (temploTarget) {
+                        guardianData.activeContext.reino = reinoTarget.name;
+                        guardianData.activeContext.templo = temploTarget.name;
+                        responseText = `Guardián: Has entrado al Templo "${temploTarget.name}" en el Reino de "${reinoTarget.name}". Tu foco está establecido.`;
+                    } else {
+                        responseText = `Guardián: No se encontró el Templo "${temploName}" en ese Reino.`;
+                    }
+                } else {
+                    responseText = `Guardián: No se encontró el Reino "${reinoName}".`;
+                }
+            } else {
+                responseText = "Guardián: Comando inválido. Usa: entrar en templo [nombre] de [reino].";
+            }
+
+        // Comando: salir del templo
+        } else if (lowerCaseCommand.trim() === 'salir del templo') {
+            if (guardianData.activeContext.templo) {
+                const temploAnterior = guardianData.activeContext.templo;
+                guardianData.activeContext.reino = null;
+                guardianData.activeContext.templo = null;
+                responseText = `Guardián: Has salido del Templo "${temploAnterior}". Tu foco ha sido liberado.`;
+            } else {
+                responseText = `Guardián: No estás dentro de ningún Templo.`;
+            }
+
+        // Comando: estado
+        } else if (lowerCaseCommand.trim() === 'estado') {
+            const { reino, templo } = guardianData.activeContext;
+            if (templo) {
+                responseText = `Guardián: Tu foco actual es el Templo "${templo}" en el Reino de "${reino}".`;
+            } else {
+                responseText = `Guardián: No tienes un foco activo. Estás operando a nivel de Reinos.`;
+            }
+
+        // Comando: contrato de duración (legado, sin contexto)
         } else {
-            const durationMatch = command.match(/(\d+)\s*(minutos|min|m)/i);
+            const durationMatch = lowerCaseCommand.match(/(\d+)\s*(minutos|min|m)/);
             if (durationMatch) {
                 const duration = parseInt(durationMatch[1], 10);
                 const task = command.replace(durationMatch[0], '').trim();
                 responseText = `Guardián: Contrato aceptado. Tarea: '${task}'. Duración: ${duration} minutos. El tiempo empieza ahora.`;
             } else {
-                responseText = "Guardián: Comando no reconocido. Prueba 'crear reino [nombre]', 'listar reinos' o define un contrato con duración.";
+                responseText = "Guardián: Comando no reconocido. Revisa los comandos disponibles o define un contrato con duración.";
             }
         }
         
+        // Añadir respuesta del Guardián y guardar datos
         addMessage(responseText, 'guardian-message');
         guardianData.chat_history.push({ text: responseText, sender: 'guardian-message' });
-        saveData(); // Guardamos todos los datos (chat y reinos) después de cualquier operación
+        saveData();
     }
 
     // --- PUNTO DE ENTRADA ---
