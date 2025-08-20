@@ -86,40 +86,34 @@ function onDeviceReady() {
     // --- PROCESADOR DE COMANDOS (EL CEREBRO DEL GUARDIÁN) ---
         // --- PROCESADOR DE COMANDOS (EL CEREBRO DEL GUARDIÁN) ---
         // --- PROCESADOR DE COMANDOS (EL CEREBRO DEL GUARDIÁN) ---
+        // --- PROCESADOR DE COMANDOS (RECONSTRUIDO) ---
     function processCommand(command) {
         let responseText = "";
         const lowerCaseCommand = command.toLowerCase();
         const { reino: activeReino, templo: activeTemplo } = guardianData.activeContext;
+        let match;
 
-        // --- LÓGICA DE COMANDOS CON EXPRESIONES REGULARES (MÁS FLEXIBLES) ---
+        // --- LÓGICA DE COMANDOS (ORDENADA POR PRIORIDAD Y PRECISIÓN) ---
 
-        // Comando: Crear Reino (ej: "crea el reino Pruebas")
-        let match = command.match(/crea(?:r| el)? reino (.*)/i);
+        // Comando: Crear Reino (ej: "crear reino [nombre completo]")
+        match = lowerCaseCommand.match(/^crear reino (.*)/);
         if (match) {
-            const reinoName = match[1].trim();
-            const reinoExists = guardianData.reinos.some(r => r.name.toLowerCase() === reinoName.toLowerCase());
-
-            if (reinoName && !reinoExists) {
-                const nuevoReino = { name: reinoName, templos: [] };
-                guardianData.reinos.push(nuevoReino);
-                responseText = `Guardián: Reino "${reinoName}" creado con éxito.`;
-            } else if (reinoExists) {
-                responseText = `Guardián: El Reino "${reinoName}" ya existe.`;
+            const reinoName = command.substring(12).trim(); // Usamos el comando original para mantener mayúsculas
+            if (reinoName) {
+                const reinoExists = guardianData.reinos.some(r => r.name.toLowerCase() === reinoName.toLowerCase());
+                if (!reinoExists) {
+                    const nuevoReino = { name: reinoName, templos: [] };
+                    guardianData.reinos.push(nuevoReino);
+                    responseText = `Guardián: Reino "${reinoName}" creado con éxito.`;
+                } else {
+                    responseText = `Guardián: El Reino "${reinoName}" ya existe.`;
+                }
             } else {
-                responseText = "Guardián: Comando inválido. Usa: crear reino [nombre].";
+                responseText = "Guardián: Comando inválido. Debes especificar un nombre para el Reino.";
             }
         
-        // Comando: Listar Reinos
-        } else if (lowerCaseCommand.trim() === 'listar reinos') {
-            if (guardianData.reinos.length > 0) {
-                const reinoNames = guardianData.reinos.map(r => r.name);
-                responseText = "Guardián: Tus Reinos actuales:\n- " + reinoNames.join('\n- ');
-            } else {
-                responseText = "Guardián: Aún no has creado ningún Reino.";
-            }
-
-        // Comando: Crear Templo (ej: "crear templo Mision Alpha en Pruebas")
-        } else if (match = command.match(/crea(?:r)? templo (.*) en (.*)/i)) {
+        // Comando: Crear Templo (ej: "crear templo [nombre] en [reino]")
+        } else if (match = command.match(/crear templo (.*) en (.*)/i)) {
             const temploName = match[1].trim();
             const reinoName = match[2].trim();
             const reinoTarget = guardianData.reinos.find(r => r.name.toLowerCase() === reinoName.toLowerCase());
@@ -137,24 +131,8 @@ function onDeviceReady() {
                 responseText = `Guardián: No se encontró el Reino "${reinoName}".`;
             }
 
-        // Comando: Listar Templos
-        } else if (match = command.match(/lista(?:r)? templos en (.*)/i)) {
-            const reinoName = match[1].trim();
-            const reinoTarget = guardianData.reinos.find(r => r.name.toLowerCase() === reinoName.toLowerCase());
-
-            if (reinoTarget) {
-                if (reinoTarget.templos.length > 0) {
-                    const temploNames = reinoTarget.templos.map(t => `${t.name} (Nivel ${t.level})`);
-                    responseText = `Guardián: Templos en "${reinoTarget.name}":\n- ` + temploNames.join('\n- ');
-                } else {
-                    responseText = `Guardián: El Reino de "${reinoTarget.name}" no tiene Templos.`;
-                }
-            } else {
-                responseText = `Guardián: No se encontró el Reino "${reinoName}".`;
-            }
-            
         // Comando: Entrar en Templo
-        } else if (match = command.match(/entra(?:r)? en templo (.*) de (.*)/i)) {
+        } else if (match = command.match(/entrar en templo (.*) de (.*)/i)) {
             const temploName = match[1].trim();
             const reinoName = match[2].trim();
             const reinoTarget = guardianData.reinos.find(r => r.name.toLowerCase() === reinoName.toLowerCase());
@@ -172,59 +150,17 @@ function onDeviceReady() {
                 responseText = `Guardián: No se encontró el Reino "${reinoName}".`;
             }
 
-        // Comando: Salir del Templo
-        } else if (lowerCaseCommand.match(/salir(?: del)? templo/)) {
-            if (activeTemplo) {
-                const temploAnterior = activeTemplo;
-                guardianData.activeContext.reino = null;
-                guardianData.activeContext.templo = null;
-                responseText = `Guardián: Has salido del Templo "${temploAnterior}". Foco liberado.`;
-            } else {
-                responseText = `Guardián: No estás dentro de ningún Templo.`;
-            }
-
-        // Comando: Estado
-        } else if (lowerCaseCommand.trim() === 'estado') {
-            if (activeTemplo) {
-                responseText = `Guardián: Foco actual: Templo "${activeTemplo}" (Reino: "${activeReino}").`;
-            } else {
-                responseText = `Guardián: Sin foco activo. Operando a nivel de Reinos.`;
-            }
-        
-        // Comando: Listar Contratos
-        } else if (match = command.match(/lista(?:r)? contratos en (.*) de (.*)/i)) {
-            const temploName = match[1].trim();
-            const reinoName = match[2].trim();
-            const reinoTarget = guardianData.reinos.find(r => r.name.toLowerCase() === reinoName.toLowerCase());
-
-            if (reinoTarget) {
-                const temploTarget = reinoTarget.templos.find(t => t.name.toLowerCase() === temploName.toLowerCase());
-                if (temploTarget) {
-                     if (temploTarget.contracts.length > 0) {
-                        const contractDescriptions = temploTarget.contracts.map(c => `[${c.status}] ${c.description}`);
-                        responseText = `Guardián: Contratos en Templo "${temploTarget.name}":\n- ` + contractDescriptions.join('\n- ');
-                    } else {
-                        responseText = `Guardián: El Templo "${temploTarget.name}" no tiene contratos.`;
-                    }
-                } else {
-                    responseText = `Guardián: No se encontró el Templo "${temploName}".`;
-                }
-            } else {
-                responseText = `Guardián: No se encontró el Reino "${reinoName}".`;
-            }
-
         // Comando: Siguiente Contrato
-        } else if (match = command.match(/siguiente contrato(?: en (.*) de (.*))?/i)) {
+        } else if (match = lowerCaseCommand.match(/^siguiente contrato/)) {
             let temploTarget, reinoTarget;
-            // Si se especifica el templo y reino en el comando
-            if (match[1] && match[2]) {
-                const temploName = match[1].trim();
-                const reinoName = match[2].trim();
+            const detailMatch = command.match(/siguiente contrato en (.*) de (.*)/i);
+
+            if (detailMatch) { // Si se especifica el templo y reino
+                const temploName = detailMatch[1].trim();
+                const reinoName = detailMatch[2].trim();
                 reinoTarget = guardianData.reinos.find(r => r.name.toLowerCase() === reinoName.toLowerCase());
                 if(reinoTarget) temploTarget = reinoTarget.templos.find(t => t.name.toLowerCase() === temploName.toLowerCase());
-            } 
-            // Si ya estamos dentro de un templo
-            else if (activeTemplo) {
+            } else if (activeTemplo) { // Si ya estamos dentro de un templo
                 reinoTarget = guardianData.reinos.find(r => r.name.toLowerCase() === activeReino.toLowerCase());
                 if(reinoTarget) temploTarget = reinoTarget.templos.find(t => t.name.toLowerCase() === activeTemplo.toLowerCase());
             }
@@ -243,7 +179,7 @@ function onDeviceReady() {
             }
 
         // Comando: Contrato Completado
-        } else if (lowerCaseCommand.match(/contrato completado/)) {
+        } else if (lowerCaseCommand.trim() === 'contrato completado') {
             if (activeTemplo) {
                 const reino = guardianData.reinos.find(r => r.name.toLowerCase() === activeReino.toLowerCase());
                 const templo = reino.templos.find(t => t.name.toLowerCase() === activeTemplo.toLowerCase());
@@ -257,26 +193,50 @@ function onDeviceReady() {
                     responseText = `Guardián: No hay contratos pendientes que completar en el Templo "${activeTemplo}".`;
                 }
             } else {
-                responseText = `Guardián: Comando inválido. Debes estar dentro de un Templo para completar un contrato. Usa "siguiente contrato en..." para establecer un foco.`;
+                responseText = `Guardián: Comando inválido. Debes estar dentro de un Templo para completar un contrato.`;
             }
 
-        // Lógica de Contrato por defecto (si hay foco)
-        } else if (activeTemplo) {
-            const reino = guardianData.reinos.find(r => r.name.toLowerCase() === activeReino.toLowerCase());
-            const templo = reino.templos.find(t => t.name.toLowerCase() === activeTemplo.toLowerCase());
-            const nuevoContrato = { description: command, status: 'pendiente' };
-            templo.contracts.push(nuevoContrato);
-            responseText = `Guardián: Contrato añadido al Templo "${activeTemplo}":\n> ${command}`;
-
-        // Lógica de Temporizador por defecto (si no hay foco ni comando)
-        } else {
-            match = lowerCaseCommand.match(/(.*) en (\d+)\s*(minutos|min|m)/) || lowerCaseCommand.match(/(.*) durante (\d+)\s*(minutos|min|m)/);
-            if (match) {
-                const task = match[1].trim();
-                const duration = parseInt(match[2], 10);
-                responseText = `Guardián: Temporizador aceptado. Tarea: '${task}'. Duración: ${duration} minutos. El tiempo empieza ahora.`;
+        // --- Comandos Simples (Listar, Salir, Estado) ---
+        } else if (lowerCaseCommand.trim() === 'listar reinos') {
+            if (guardianData.reinos.length > 0) {
+                const reinoNames = guardianData.reinos.map(r => r.name);
+                responseText = "Guardián: Tus Reinos actuales:\n- " + reinoNames.join('\n- ');
             } else {
-                responseText = "Guardián: Comando no reconocido. Establece un foco ('entrar en templo...') o define un contrato/temporizador.";
+                responseText = "Guardián: Aún no has creado ningún Reino.";
+            }
+        } else if (lowerCaseCommand.trim() === 'salir del templo') {
+            if (activeTemplo) {
+                const temploAnterior = activeTemplo;
+                guardianData.activeContext.reino = null;
+                guardianData.activeContext.templo = null;
+                responseText = `Guardián: Has salido del Templo "${temploAnterior}". Foco liberado.`;
+            } else {
+                responseText = `Guardián: No estás dentro de ningún Templo.`;
+            }
+        } else if (lowerCaseCommand.trim() === 'estado') {
+            if (activeTemplo) {
+                responseText = `Guardián: Foco actual: Templo "${activeTemplo}" (Reino: "${activeReino}").`;
+            } else {
+                responseText = `Guardián: Sin foco activo. Operando a nivel de Reinos.`;
+            }
+
+        // --- Lógica por Defecto (Contratos, Temporizadores o Error) ---
+        } else {
+            if (activeTemplo) { // Si hay foco, es un contrato nuevo
+                const reino = guardianData.reinos.find(r => r.name.toLowerCase() === activeReino.toLowerCase());
+                const templo = reino.templos.find(t => t.name.toLowerCase() === activeTemplo.toLowerCase());
+                const nuevoContrato = { description: command, status: 'pendiente' };
+                templo.contracts.push(nuevoContrato);
+                responseText = `Guardián: Contrato añadido al Templo "${activeTemplo}":\n> ${command}`;
+            } else { // Si no hay foco, busca un temporizador o da error
+                match = command.match(/(.*) (?:en|durante) (\d+)\s*(minutos|min|m)/i);
+                if (match) {
+                    const task = match[1].trim();
+                    const duration = parseInt(match[2], 10);
+                    responseText = `Guardián: Temporizador aceptado. Tarea: '${task}'. Duración: ${duration} minutos. El tiempo empieza ahora.`;
+                } else {
+                    responseText = "Guardián: Comando no reconocido. Establece un foco ('entrar en templo...') o define un contrato/temporizador.";
+                }
             }
         }
         
@@ -284,6 +244,7 @@ function onDeviceReady() {
         guardianData.chat_history.push({ text: responseText, sender: 'guardian-message' });
         saveData();
     }
+
 
 
 
