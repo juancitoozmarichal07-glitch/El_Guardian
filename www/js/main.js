@@ -84,6 +84,7 @@ function onDeviceReady() {
     }
 
     // --- PROCESADOR DE COMANDOS (EL CEREBRO DEL GUARDIÁN) ---
+        // --- PROCESADOR DE COMANDOS (EL CEREBRO DEL GUARDIÁN) ---
     function processCommand(command) {
         let responseText = "";
         const lowerCaseCommand = command.toLowerCase();
@@ -93,9 +94,11 @@ function onDeviceReady() {
 
         if (lowerCaseCommand.startsWith('crear reino ')) {
             const reinoName = command.substring(12).trim();
+            // CORRECCIÓN: Comparamos todo en minúsculas
             const reinoExists = guardianData.reinos.some(r => r.name.toLowerCase() === reinoName.toLowerCase());
 
             if (reinoName && !reinoExists) {
+                // Guardamos el nombre con las mayúsculas originales
                 const nuevoReino = { name: reinoName, templos: [] };
                 guardianData.reinos.push(nuevoReino);
                 responseText = `Guardián: Reino "${reinoName}" creado con éxito.`;
@@ -118,14 +121,16 @@ function onDeviceReady() {
             if (match) {
                 const temploName = match[1].trim();
                 const reinoName = match[2].trim();
+                // CORRECCIÓN: Buscamos el reino en minúsculas
                 const reinoTarget = guardianData.reinos.find(r => r.name.toLowerCase() === reinoName.toLowerCase());
 
                 if (reinoTarget) {
+                    // CORRECCIÓN: Buscamos el templo en minúsculas
                     const temploExists = reinoTarget.templos.some(t => t.name.toLowerCase() === temploName.toLowerCase());
                     if (!temploExists) {
                         const nuevoTemplo = { name: temploName, level: 1, contracts: [] };
                         reinoTarget.templos.push(nuevoTemplo);
-                        responseText = `Guardián: Templo "${temploName}" erigido en el Reino de "${reinoName}".`;
+                        responseText = `Guardián: Templo "${temploName}" erigido en el Reino de "${reinoTarget.name}".`;
                     } else {
                         responseText = `Guardián: El Templo "${temploName}" ya existe en ese Reino.`;
                     }
@@ -138,14 +143,15 @@ function onDeviceReady() {
 
         } else if (lowerCaseCommand.startsWith('listar templos en ')) {
             const reinoName = command.substring(18).trim();
+            // CORRECCIÓN: Buscamos el reino en minúsculas
             const reinoTarget = guardianData.reinos.find(r => r.name.toLowerCase() === reinoName.toLowerCase());
 
             if (reinoTarget) {
                 if (reinoTarget.templos.length > 0) {
                     const temploNames = reinoTarget.templos.map(t => `${t.name} (Nivel ${t.level})`);
-                    responseText = `Guardián: Templos en "${reinoName}":\n- ` + temploNames.join('\n- ');
+                    responseText = `Guardián: Templos en "${reinoTarget.name}":\n- ` + temploNames.join('\n- ');
                 } else {
-                    responseText = `Guardián: El Reino de "${reinoName}" no tiene Templos.`;
+                    responseText = `Guardián: El Reino de "${reinoTarget.name}" no tiene Templos.`;
                 }
             } else {
                 responseText = `Guardián: No se encontró el Reino "${reinoName}".`;
@@ -156,9 +162,11 @@ function onDeviceReady() {
             if (match) {
                 const temploName = match[1].trim();
                 const reinoName = match[2].trim();
+                // CORRECCIÓN: Buscamos el reino en minúsculas
                 const reinoTarget = guardianData.reinos.find(r => r.name.toLowerCase() === reinoName.toLowerCase());
 
                 if (reinoTarget) {
+                    // CORRECCIÓN: Buscamos el templo en minúsculas
                     const temploTarget = reinoTarget.templos.find(t => t.name.toLowerCase() === temploName.toLowerCase());
                     if (temploTarget) {
                         guardianData.activeContext.reino = reinoTarget.name;
@@ -203,9 +211,9 @@ function onDeviceReady() {
                     if (temploTarget) {
                          if (temploTarget.contracts.length > 0) {
                             const contractDescriptions = temploTarget.contracts.map(c => `[${c.status}] ${c.description}`);
-                            responseText = `Guardián: Contratos en Templo "${temploName}":\n- ` + contractDescriptions.join('\n- ');
+                            responseText = `Guardián: Contratos en Templo "${temploTarget.name}":\n- ` + contractDescriptions.join('\n- ');
                         } else {
-                            responseText = `Guardián: El Templo "${temploName}" no tiene contratos.`;
+                            responseText = `Guardián: El Templo "${temploTarget.name}" no tiene contratos.`;
                         }
                     } else {
                         responseText = `Guardián: No se encontró el Templo "${temploName}".`;
@@ -246,11 +254,10 @@ function onDeviceReady() {
                 responseText = "Guardián: Comando inválido. Usa: siguiente contrato en [templo] de [reino].";
             }
 
-        // --- NUEVO: COMPLETAR EL CONTRATO ---
         } else if (lowerCaseCommand.trim() === 'contrato completado') {
             if (activeTemplo) {
-                const reino = guardianData.reinos.find(r => r.name === activeReino);
-                const templo = reino.templos.find(t => t.name === activeTemplo);
+                const reino = guardianData.reinos.find(r => r.name.toLowerCase() === activeReino.toLowerCase());
+                const templo = reino.templos.find(t => t.name.toLowerCase() === activeTemplo.toLowerCase());
 
                 const contratoACompletar = templo.contracts.find(c => c.status === 'pendiente');
 
@@ -268,12 +275,12 @@ function onDeviceReady() {
             }
 
         } else if (activeTemplo) {
-            const reino = guardianData.reinos.find(r => r.name === activeReino);
-            const templo = reino.templos.find(t => t.name === activeTemplo);
+            const reino = guardianData.reinos.find(r => r.name.toLowerCase() === activeReino.toLowerCase());
+            const templo = reino.templos.find(t => t.name.toLowerCase() === activeTemplo.toLowerCase());
             
             const nuevoContrato = { description: command, status: 'pendiente' };
             templo.contracts.push(nuevoContrato);
-            responseText = `Guardián: Contrato añadido al Templo "${activeTemplo}":\n> ${command}`;
+responseText = `Guardián: Contrato añadido al Templo "${activeTemplo}":\n> ${command}`;
 
         } else {
             const durationMatch = lowerCaseCommand.match(/(\d+)\s*(minutos|min|m)/);
@@ -290,6 +297,7 @@ function onDeviceReady() {
         guardianData.chat_history.push({ text: responseText, sender: 'guardian-message' });
         saveData();
     }
+
 
     // --- PUNTO DE ENTRADA ---
     loadData();
