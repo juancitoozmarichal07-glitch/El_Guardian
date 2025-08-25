@@ -52,4 +52,5 @@ function startChecking() {
             clearInterval(checkInterval);
             checkInterval = null;
         }
-    }, 60000
+    }, 60000);
+}
