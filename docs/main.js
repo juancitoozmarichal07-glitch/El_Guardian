@@ -4,14 +4,17 @@
 // =================================================================
 
 // --- CONFIGURACIÓN GLOBAL Y ESTADO DEL SISTEMA ---
+// --- CONFIGURACIÓN GLOBAL Y ESTADO DEL SISTEMA ---
 const NOMBRE_USUARIO = "Juan";
 let estadoConversacion = { modo: 'libre', paso: '', datosPlan: { mision: '', especificaciones: [], inicio: '', duracion: '' } };
+let contextoConversacion = null; // <--- AÑADE ESTA LÍNEA AQUÍ
 let sistema = {
     historialChat: [],
     contratos: [],
     racha: 0,
     logros: []
 };
+
 
 // --- REFERENCIAS AL DOM (se asignan en DOMContentLoaded) ---
 let bootContainer, bootMessage, appContainer, history, chatInput, micButton, sendButton, navBar, screens, listaContratosContainer, rachaContainer;
@@ -173,10 +176,15 @@ function procesarComandoUsuario(comando) {
 // --- SECUENCIA DE ARRANQUE Y MENSAJERÍA (Sin cambios) ---
 function iniciarSecuenciaArranque() {
     const mensajes = [
-        { texto: "Iniciando Núcleo CXQIA", animar: true },{ texto: "Cargando sistema GuardianOS [V1.1] 🛡️", animar: true } , { texto: "Activando RAI de mensaje 💬", animar: true } , 
-        { texto: "Desplegando protoloco Filos de Navajas ⚔️", animar: true },
-        { texto: "Activando Protocolo de Reactivación (Anti-Deriva) 🔄", animar: true },{ texto: "Verificacion De Diario y Registros De USO 📖", animar: true } , { texto: "Sistemas auxiliares online 🌐", animar: true } , 
-        { texto: "Todos Los Sistemas Operativos listos.", animar: false },
+    { texto: "Iniciando núcleo CXQIA... ✅", animar: true },
+    { texto: "Cargando Sistema Guardián OS [v1.1]... 🛡️", animar: true },
+    { texto: "Activando protocolo RAI de Mensajes... 💬", animar: true },
+    { texto: "Inicializando Sistema de Ruletas (SMOR)... 🎰", animar: false },
+    { texto: "Desplegando Protocolo Filo de Navajas... ⚔️", animar: false },
+    { texto: "Activando Protocolo de Reactivación (Anti-Deriva)... 🔄", animar: false },
+    { texto: "Verificación de Diario & Registro de Uso... 📖", animar: true },
+    { texto: "Sistemas auxiliares en línea... 🌐", animar: true },
+    { texto: "Todos los sistemas listos. Usuario en control. 🎮", animar: false} ,
         { texto: `Bienvenido de nuevo, ${NOMBRE_USUARIO}.`, animar: false }
     ];
     let i = 0;
@@ -288,21 +296,61 @@ function mostrarRuleta(opciones) {
 }
 
 // --- CEREBRO CONVERSACIONAL Y LÓGICA DE DISEÑO (ACTUALIZADO) ---
+/**
+ * Simula una llamada a una IA conversacional con memoria y contexto.
+ * Esta es la versión mejorada que puede seguir una conversación.
+ */
 async function llamarAGrok(textoUsuario) {
-    // ... (La lógica interna de llamar a una IA externa no cambia)
-    const textoEnMinusculas = textoUsuario.toLowerCase();
-    let respuestaIA = "Entendido. ¿En qué más puedo ayudarte hoy?";
-    if (textoEnMinusculas.includes('contrato') || textoEnMinusculas.includes('forjar') || textoEnMinusculas.includes('ruleta')) {
-        respuestaIA = 'MODO_DISEÑO';
+    const texto = textoUsuario.toLowerCase();
+    let respuestaIA = "";
+
+    // 1. Lógica de respuesta basada en el CONTEXTO actual
+    if (contextoConversacion) {
+        if (contextoConversacion === 'productividad') {
+            if (texto.includes('técnica') || texto.includes('método')) {
+                respuestaIA = "Una técnica poderosa es la de Pomodoro: 25 minutos de trabajo enfocado y 5 de descanso. Otra es 'Comerse la Rana', que consiste en hacer la tarea más difícil primero. ¿Quieres que profundice en alguna?";
+            } else {
+                respuestaIA = `Continuando con la productividad, ${NOMBRE_USUARIO}, es clave entender que no se trata de hacer más, sino de hacer lo correcto. La claridad en tus objetivos es el primer paso. ¿Sobre qué aspecto quieres que hablemos ahora?`;
+                contextoConversacion = null; // Resetear para no quedar atrapado en el bucle
+            }
+        } else if (contextoConversacion === 'filosofia') {
+             if (texto.includes('marco aurelio') || texto.includes('séneca')) {
+                respuestaIA = "Marco Aurelio y Séneca son pilares del estoicismo. El primero nos enseña sobre el dominio interno desde el poder, y el segundo sobre la serenidad ante la adversidad. Su sabiduría es atemporal.";
+            } else {
+                respuestaIA = "La filosofía nos da herramientas para la vida. El estoicismo, por ejemplo, nos enseña a diferenciar entre lo que podemos controlar y lo que no. Aceptar esto es el camino a la tranquilidad. ¿Te interesa este enfoque?";
+            }
+        }
+        // Si la respuesta se generó por contexto, la enviamos y salimos
+        if (respuestaIA) {
+            addGuardianMessage(respuestaIA);
+            return;
+        }
     }
 
-    if (respuestaIA.trim().toUpperCase() === 'MODO_DISEÑO') {
-        estadoConversacion = { modo: 'diseño', paso: 'x1', datosPlan: { mision: '', especificaciones: [], inicio: '', duracion: '' } };
-        addGuardianMessage("Entendido. Entrando en Modo Diseño.\n\n**Paso 1: La Misión.**\nDime la opción u opciones para la primera ruleta (X1), separadas por comas.", false);
+    // 2. Lógica de respuesta basada en PALABRAS CLAVE (si no hay contexto)
+    if (texto.includes('hola') || texto.includes('buenos días')) {
+        respuestaIA = `Saludos, ${NOMBRE_USUARIO}. Estoy listo para asistirte. ¿Forjamos un Contrato o prefieres conversar?`;
+    } else if (texto.includes('gracias')) {
+        respuestaIA = "Es mi deber. La disciplina es el puente entre metas y logros. ¿Algo más?";
+    } else if (texto.includes('ayuda') || texto.includes('qué puedes hacer')) {
+        respuestaIA = "Mi propósito es ayudarte a forjar y cumplir 'Contratos' contigo mismo para construir disciplina. Puedes decir 'crear contrato' para empezar. También podemos conversar sobre productividad, filosofía o tus objetivos.";
+    } else if (texto.includes('productividad') || texto.includes('procrastinar')) {
+        respuestaIA = "La productividad es un tema central. Podemos hablar sobre técnicas, cómo evitar la procrastinación o establecer sistemas. ¿Qué te interesa más?";
+        contextoConversacion = 'productividad'; // ¡Establecemos el contexto!
+    } else if (texto.includes('filosofía') || texto.includes('estoicismo')) {
+        respuestaIA = "Una excelente elección. La filosofía nos da un marco para la acción y la serenidad. El estoicismo es particularmente útil para la autodisciplina. ¿Quieres que exploremos sus principios?";
+        contextoConversacion = 'filosofia'; // ¡Establecemos el contexto!
+    } else if (texto.includes('cómo estás') || texto.includes('qué tal')) {
+        respuestaIA = "Operativo al 100%. Mis sistemas están listos para ayudarte a alcanzar tus metas. ¿En qué nos enfocamos hoy?";
     } else {
-        addGuardianMessage(respuestaIA);
+        // 3. Respuesta por defecto si no entiende nada
+        respuestaIA = `No he comprendido del todo tu comando, ${NOMBRE_USUARIO}. Recuerda que puedes pedirme 'ayuda' para ver mis funciones, o podemos hablar sobre temas como 'productividad'.`;
     }
+
+    // Añade la respuesta de la IA al chat
+    addGuardianMessage(respuestaIA);
 }
+
 
 function procesarPasoDiseño(entrada) {
     const { paso } = estadoConversacion;
@@ -380,11 +428,28 @@ function sellarContrato() {
     guardarSistemaEnDB();
 }
 
+/**
+ * Función principal que decide cómo responder al usuario.
+ * Deriva al modo diseño si es necesario, o llama a la IA para una respuesta libre.
+ */
 function getGuardianResponse(command) {
-    if (estadoConversacion.modo === 'libre') {
-        llamarAGrok(command);
-    } else {
+    if (estadoConversacion.modo === 'diseño') {
         procesarPasoDiseño(command);
+        return; // Salimos para no procesar nada más
+    }
+
+    const comandoNormalizado = command.toLowerCase();
+    const palabrasClaveDiseño = ['contrato', 'forjar', 'ruleta', 'crear', 'diseñar', 'pacto'];
+
+    // Si el usuario quiere iniciar el modo diseño de forma explícita
+    if (palabrasClaveDiseño.some(palabra => comandoNormalizado.includes(palabra))) {
+        estadoConversacion = { modo: 'diseño', paso: 'x1', datosPlan: { mision: '', especificaciones: [], inicio: '', duracion: '' } };
+        contextoConversacion = null; // Reseteamos el contexto de charla
+        addGuardianMessage("Entendido. Entrando en Modo Diseño.\n\n**Paso 1: La Misión.**\nDime la opción u opciones para la primera ruleta (X1), separadas por comas.", false);
+        guardarSistemaEnDB();
+    } else {
+        // Si no, es una conversación normal. Llamamos a la IA.
+        llamarAGrok(command);
     }
 }
 
