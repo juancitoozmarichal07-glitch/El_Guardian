@@ -1,6 +1,5 @@
 // =================================================================
-// MAIN.JS - VERSIÓN 8.1 "LA VICTORIA FINAL"
-// CEREBRO COMPLETO DEL GUARDIÁN CON LÓGICA PWA CORREGIDA
+// MAIN.JS - VERSIÓN CORREGIDA PARA GITHUB PAGES
 // =================================================================
 
 // --- CONFIGURACIÓN GLOBAL Y ESTADO DEL SISTEMA ---
@@ -102,7 +101,8 @@ function setupEventListeners(navBar, screens) {
         if (targetScreenId === 'calendario-screen') renderizarListaContratos();
 
         screens.forEach(screen => screen.classList.toggle('active', screen.id === targetScreenId));
-        document.querySelectorAll('.nav-button').forEach(button => button.classList.remove('active');
+        // CORRECCIÓN 2: Se añadió el paréntesis de cierre que faltaba
+        document.querySelectorAll('.nav-button').forEach(button => button.classList.remove('active'));
         targetButton.classList.add('active');
     });
 
@@ -111,14 +111,16 @@ function setupEventListeners(navBar, screens) {
     // --- CÓDIGO DE REGISTRO DE PWA ---
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            // RUTA CORREGIDA PARA GITHUB PAGES CON CARPETA /docs/
-            navigator.serviceWorker.register('./service-worker.js')
+            // CORRECCIÓN 1: Ruta absoluta al service worker con el nombre del repositorio
+            navigator.serviceWorker.register('/El_Guardian/service-worker.js', { scope: '/El_Guardian/' })
                 .then(registration => {
                     console.log('Service Worker registrado con éxito.');
                     // Lógica para pedir permisos de notificación y sincronización periódica
-                    return registration.periodicSync.register('check-contracts', {
-                        minInterval: 12 * 60 * 60 * 1000, // Mínimo 12 horas
-                    });
+                    if (registration.periodicSync) {
+                        return registration.periodicSync.register('check-contracts', {
+                            minInterval: 12 * 60 * 60 * 1000, // Mínimo 12 horas
+                        });
+                    }
                 })
                 .then(() => console.log('Sincronización periódica registrada.'))
                 .catch(error => {
@@ -130,6 +132,7 @@ function setupEventListeners(navBar, screens) {
 
 function procesarComandoUsuario(comando) {
     addUserMessage(comando);
+    chatInput.value = ''; // Limpiar input
     setTimeout(() => {
         showThinkingIndicator();
         setTimeout(() => {
@@ -200,7 +203,7 @@ function addUserMessage(texto, guardar = true) {
 function addGuardianMessage(texto, guardar = true) {
     const messageBubble = document.createElement('div');
     messageBubble.className = 'message-bubble guardian-message';
-    messageBubble.textContent = texto;
+    messageBubble.innerHTML = texto.replace(/\n/g, '<br>');
     history.appendChild(messageBubble);
     history.scrollTop = history.scrollHeight;
     if (guardar) {
@@ -280,11 +283,6 @@ Esta regla es inquebrantable. Es la transición entre ser un amigo y ser una her
     ];
 
     try {
-        // Aquí iría el fetch a la API de Groq si la clave estuviera disponible
-        // const response = await fetch(...)
-        // const data = await response.json();
-        // const respuestaIA = data.choices[0].message.content;
-
         // Simulación de respuesta para pruebas sin API
         const textoEnMinusculas = textoUsuario.toLowerCase();
         let respuestaIA = "Entendido. ¿En qué más puedo ayudarte hoy?";
@@ -422,8 +420,6 @@ function manejarAccionesContrato(e) {
 
     if (e.target.classList.contains('cumplir-btn')) {
         sistema.contratos[contratoIndex].estado = 'cumplido';
-        // Lógica de racha: Si el último contrato cumplido no fue hoy, se resetea y se suma 1.
-        // (Simplificado por ahora: solo suma)
         sistema.racha++;
         addGuardianMessage("¡Excelente! Contrato cumplido. Tu racha aumenta. La disciplina es la forja del carácter.");
     } else if (e.target.classList.contains('romper-btn')) {
