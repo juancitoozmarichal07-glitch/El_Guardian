@@ -174,9 +174,9 @@ function procesarComandoUsuario(comando) {
 function iniciarSecuenciaArranque() {
     const mensajes = [
         { texto: "Iniciando Núcleo CXQIA", animar: true },{ texto: "Cargando sistema GuardianOS [V1.1] 🛡️", animar: true } , { texto: "Activando RAI de mensaje 💬", animar: true } , 
-        { texto: "Desplegando protoloco Filos de Navajas ⚔️", animar: false },
-        { texto: "Activando Protocolo de Reactivación (Anti-Deriva) 🔄", animar: false },{ texto: "Verificacion De Diario y Registros De USO 📖", animar: true } , { texto: "Sistemas auxiliares online 🌐", animar: true } , 
-        { texto: "Todos Los Sistemas operativos listos.", animar: true },
+        { texto: "Desplegando protoloco Filos de Navajas ⚔️", animar: true },
+        { texto: "Activando Protocolo de Reactivación (Anti-Deriva) 🔄", animar: true },{ texto: "Verificacion De Diario y Registros De USO 📖", animar: true } , { texto: "Sistemas auxiliares online 🌐", animar: true } , 
+        { texto: "Todos Los Sistemas Operativos listos.", animar: false },
         { texto: `Bienvenido de nuevo, ${NOMBRE_USUARIO}.`, animar: false }
     ];
     let i = 0;
