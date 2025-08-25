@@ -307,12 +307,23 @@ function procesarPasoDiseño(entrada) {
     const { paso } = estadoConversacion;
     const opciones = entrada.split(',').map(s => s.trim()).filter(Boolean);
 
-    if (opciones.length > 1) {
-        mostrarRuleta(opciones);
-        return;
+    // --- ¡CAMBIO CLAVE AQUÍ! ---
+    // Ahora, si hay UNA o más opciones, mostramos la ruleta.
+    if (opciones.length >= 1) { 
+        // Si el usuario escribió algo que no es una lista (ej: "listo", "borrar"),
+        // no queremos una ruleta para eso. La ruleta es solo para las opciones de misión.
+        const comandosEspeciales = ['listo', 'borrar'];
+        if (opciones.length === 1 && comandosEspeciales.includes(opciones[0].toLowerCase())) {
+            // Si es un comando especial, no hacemos la ruleta y continuamos como antes.
+        } else {
+            mostrarRuleta(opciones);
+            return; // Detenemos la función aquí para esperar el resultado de la ruleta.
+        }
     }
 
     const eleccion = entrada;
+    // ... el resto de la función sigue
+
 
     if (paso === 'x1') {
         estadoConversacion.datosPlan.mision = eleccion;
