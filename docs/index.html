@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guardian</title>
     
-    <!-- CORRECCIÓN CLAVE: La URL base para que encuentre los archivos en GitHub Pages -->
+    <!-- La URL base para que todo funcione en GitHub Pages -->
     <base href="/El_Guardian/">
 
     <!-- Enlaces a la hoja de estilos y al manifiesto -->
@@ -47,7 +47,11 @@
 
             <!-- PANTALLA 3: CALENDARIO DE CONTRATOS -->
             <div id="calendario-screen" class="screen">
-                <h1>Calendario de Contratos</h1>
+                <!-- El título ahora es un contenedor para poder añadir un subtítulo o fecha si es necesario -->
+                <div class="screen-header">
+                    <h1>Calendario de Contratos</h1>
+                </div>
+                <!-- El contenedor de la lista de contratos no cambia -->
                 <div id="lista-contratos-container"></div>
             </div>
         </main>
