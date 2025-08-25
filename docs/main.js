@@ -351,58 +351,94 @@ async function llamarAGrok(textoUsuario) {
     addGuardianMessage(respuestaIA);
 }
 
-
+/**
+ * Procesa cada paso de la creación de un contrato, siguiendo la lógica de capas Xn.
+ * Creado según la especificación del usuario: la ruleta siempre gira.
+ */
 function procesarPasoDiseño(entrada) {
     const { paso } = estadoConversacion;
-    const opciones = entrada.split(',').map(s => s.trim()).filter(Boolean);
 
-    // MEJORA: Ruleta para 1 o más opciones, ignorando comandos
-    if (opciones.length >= 1) {
+    // --- Lógica para mostrar la ruleta ---
+    // Esta sección decide si la entrada del usuario es para generar una ruleta.
+    const pasosDeRuleta = ['x1', 'xn', 'inicio', 'duracion'];
+    if (pasosDeRuleta.includes(paso)) {
+        const opciones = entrada.split(',').map(s => s.trim()).filter(Boolean);
         const comandosEspeciales = ['listo', 'borrar', 'ninguna'];
-        if (opciones.length === 1 && comandosEspeciales.includes(opciones[0].toLowerCase())) {
-            // Es un comando, no una opción de ruleta, así que continuamos.
-        } else {
+        const esComando = opciones.length === 1 && comandosEspeciales.includes(opciones[0].toLowerCase());
+
+        // Si el usuario ha proporcionado opciones Y NO es un comando especial, mostramos la ruleta.
+        // ¡ESTO FUERZA LA RULETA A APARECER INCLUSO CON 1 SOLA OPCIÓN!
+        if (opciones.length > 0 && !esComando) {
+            addGuardianMessage("Opciones recibidas. Gira la ruleta para sellar tu elección.", false);
             mostrarRuleta(opciones);
-            return; // Esperamos el resultado de la ruleta
+            return; // Detenemos la ejecución y esperamos el resultado de la ruleta.
         }
     }
 
+    // Si el código llega aquí, 'entrada' es el resultado de la ruleta o un comando.
     const eleccion = entrada;
 
-    if (paso === 'x1') {
-        estadoConversacion.datosPlan.mision = eleccion;
-        estadoConversacion.paso = 'xn';
-        addGuardianMessage(`Misión aceptada: **${eleccion}**.\n\n**Siguiente Paso: Especificación.**\n¿Añadir otra capa de ruleta (X2)? Dime las opciones, o escribe 'listo' para continuar.`);
-    } else if (paso === 'xn') {
-        if (eleccion.toLowerCase() === 'listo') {
-            estadoConversacion.paso = 'inicio';
-            addGuardianMessage(`Perfecto. Misión definida.\n\n**Paso Final: El Sello.**\nDime los posibles horarios de inicio (ej: 14:00, 15:00).`);
-        } else if (eleccion.toLowerCase() === 'borrar') {
-            if (estadoConversacion.datosPlan.especificaciones.length > 0) {
-                const borrada = estadoConversacion.datosPlan.especificaciones.pop();
-                addGuardianMessage(`Última especificación ('${borrada}') eliminada. ¿Nuevas opciones o 'listo'?`);
+    // --- Lógica para manejar cada paso del diseño ---
+    switch (paso) {
+        case 'x1':
+            // La elección de la primera ruleta (Misión) ha sido hecha.
+            estadoConversacion.datosPlan.mision = eleccion;
+            estadoConversacion.paso = 'xn'; // Pasamos al paso de especificaciones.
+            addGuardianMessage(
+                `Misión principal establecida: **${eleccion}**.\n\n` +
+                `**Siguiente Paso: Especificación (X2).**\n` +
+                `¿Quieres añadir una segunda capa de detalle? Introduce las opciones para la siguiente ruleta, o escribe 'listo' para saltar a la hora de inicio.`
+            );
+            break;
+
+        case 'xn':
+            // Estamos en el paso de añadir especificaciones (X2, X3, etc.).
+            if (eleccion.toLowerCase() === 'listo') {
+                estadoConversacion.paso = 'inicio';
+                addGuardianMessage(
+                    `Especificaciones completadas.\n\n` +
+                    `**Paso Final: El Sello.**\n` +
+                    `Ahora dime la hora o las posibles horas de inicio (ej: 14:00, 15:00).`
+                );
+            } else if (eleccion.toLowerCase() === 'borrar') {
+                if (estadoConversacion.datosPlan.especificaciones.length > 0) {
+                    const borrada = estadoConversacion.datosPlan.especificaciones.pop();
+                    addGuardianMessage(`Última especificación ('${borrada}') eliminada. ¿Nuevas opciones, 'listo' o 'borrar'?`);
+                } else {
+                    addGuardianMessage(`No hay especificaciones que borrar. ¿Opciones para la ruleta o 'listo'?`);
+                }
             } else {
-                addGuardianMessage(`No hay especificaciones que borrar. ¿Opciones o 'listo'?`);
+                // Se ha elegido una especificación de la ruleta.
+                estadoConversacion.datosPlan.especificaciones.push(eleccion);
+                const misionCompleta = [estadoConversacion.datosPlan.mision, ...estadoConversacion.datosPlan.especificaciones].join(' -> ');
+                addGuardianMessage(
+                    `Entendido: **${misionCompleta}**.\n\n` +
+                    `¿Añadir otra capa más (Xn)? Introduce opciones, escribe 'listo' para terminar, o 'borrar' para eliminar la última.`
+                );
             }
-        } else {
-            estadoConversacion.datosPlan.especificaciones.push(eleccion);
-            const misionCompleta = [estadoConversacion.datosPlan.mision, ...estadoConversacion.datosPlan.especificaciones].join(' -> ');
-            addGuardianMessage(`Entendido: **${misionCompleta}**.\n\n¿Otra capa más (Xn)? ¿Opciones, 'listo' o 'borrar'?`);
-        }
-    } else if (paso === 'inicio') {
-        estadoConversacion.datosPlan.inicio = eleccion;
-        estadoConversacion.paso = 'duracion';
-        // MEJORA: Preguntar por duración opcional
-        addGuardianMessage(`Hora de inicio: **${eleccion}**.\n\nAhora, la duración. Dime las opciones (ej: 30 min, 1 hora) o escribe 'ninguna' si no aplica.`);
-    } else if (paso === 'duracion') {
-        // MEJORA: Manejar duración opcional
-        if (eleccion.toLowerCase() !== 'ninguna') {
-            estadoConversacion.datosPlan.duracion = eleccion;
-        } else {
-            estadoConversacion.datosPlan.duracion = ''; // Duración vacía si es 'ninguna'
-        }
-        sellarContrato();
+            break;
+
+        case 'inicio':
+            // Se ha elegido la hora de inicio.
+            estadoConversacion.datosPlan.inicio = eleccion;
+            estadoConversacion.paso = 'duracion';
+            addGuardianMessage(
+                `Hora de inicio fijada: **${eleccion}**.\n\n` +
+                `Por último, la duración. Dime las opciones (ej: 30 min, 1 hora) o escribe 'ninguna' si no es necesario.`
+            );
+            break;
+
+        case 'duracion':
+            // Se ha elegido la duración (o ninguna).
+            if (eleccion.toLowerCase() !== 'ninguna') {
+                estadoConversacion.datosPlan.duracion = eleccion;
+            } else {
+                estadoConversacion.datosPlan.duracion = ''; // Duración vacía si es 'ninguna'.
+            }
+            sellarContrato(); // Todos los datos están listos, creamos el contrato.
+            break;
     }
+    
     guardarSistemaEnDB();
 }
 
