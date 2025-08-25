@@ -1,0 +1,119 @@
+/* =================================================================
+   CSS COMPLETO (v.8.0 - La Visión Pura, Sin Gestor)
+   ================================================================= */
+:root {
+    --background: #121212;
+    --surface: #1e1e1e;
+    --primary-text: #EAEAEA;
+    --secondary-text: #9e9e9e;
+    --accent-color: #2962ff;
+    --racha-flame-color: #ff9800;
+    --success-color: #4caf50;
+    --fail-color: #f44336;
+}
+
+html, body {
+    height: 100%; margin: 0; padding: 0; overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--background); color: var(--primary-text);
+}
+.hidden { display: none !important; }
+
+#boot-container { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; }
+#main-title { font-size: 2.5em; }
+#boot-message { font-size: 1.2em; color: var(--secondary-text); height: 1.5em; }
+
+/* --- ESTRUCTURA DE 2 CAPAS: CONTENIDO + NAV --- */
+#app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+#screen-container {
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+#nav-bar {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-around;
+    background-color: var(--surface);
+    padding: 5px 0;
+    border-top: 1px solid #333;
+}
+.nav-button { background: none; border: none; font-size: 1.8em; color: var(--secondary-text); cursor: pointer; padding: 10px 15px; }
+.nav-button.active { color: var(--accent-color); }
+
+/* --- SISTEMA DE PANTALLAS INDEPENDIENTES --- */
+.screen {
+    display: none;
+    padding: 20px;
+    box-sizing: border-box;
+    height: 100%;
+}
+.screen.active {
+    display: flex;
+    flex-direction: column;
+}
+
+/* --- PANTALLA DE CHAT (DISEÑO INTERNO) --- */
+#chat-screen {
+    padding: 0;
+}
+#history {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+#input-area {
+    flex-shrink: 0;
+    padding: 10px;
+    border-top: 1px solid var(--surface);
+    display: flex;
+    gap: 10px;
+}
+#chat-input {
+    flex-grow: 1;
+    background-color: var(--surface);
+    border: none;
+    color: var(--primary-text);
+    padding: 12px 15px;
+    border-radius: 20px;
+    font-size: 1em;
+}
+.input-button { background: none; border: none; color: var(--secondary-text); font-size: 1.5em; cursor: pointer; }
+.message-bubble { padding: 10px 15px; border-radius: 18px; max-width: 80%; line-height: 1.5; word-wrap: break-word; }
+.user-message { background-color: var(--accent-color); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+.guardian-message { background-color: var(--surface); color: var(--primary-text); align-self: flex-start; border-bottom-left-radius: 4px; white-space: pre-wrap; }
+.contrato-proposal { background-color: transparent; border: 1px solid var(--surface); font-family: 'Roboto Mono', monospace; font-size: 0.9em; padding: 12px; border-radius: 8px; white-space: pre-wrap; max-width: 100%; border-left: 3px solid var(--racha-flame-color); }
+.ruleta-container { background-color: var(--surface); border-radius: 12px; padding: 15px; margin-top: 10px; align-self: flex-start; width: 80%; }
+.ruleta-opcion { padding: 10px; border-bottom: 1px solid #333; text-align: center; }
+.ruleta-opcion.active { background-color: var(--accent-color); color: white; }
+.ruleta-boton { width: 100%; padding: 12px; background-color: var(--accent-color); color: white; border: none; border-radius: 8px; margin-top: 15px; font-weight: bold; cursor: pointer; }
+
+/* --- ESTILOS PARA LAS OTRAS PANTALLAS --- */
+.screen h1 {
+    flex-shrink: 0;
+    margin-top: 0;
+}
+#racha-container { text-align: center; }
+.racha-valor { font-size: 5em; font-weight: bold; color: var(--racha-flame-color); }
+.racha-texto { font-size: 1.2em; color: var(--secondary-text); }
+#lista-contratos-container {
+    flex-grow: 1;
+    overflow-y: auto;
+}
+.contrato-item { background-color: var(--surface); border-radius: 8px; padding: 15px; margin-bottom: 10px; border-left: 4px solid var(--accent-color); }
+.contrato-item.cumplido { border-left-color: var(--success-color); }
+.contrato-item.roto { border-left-color: var(--fail-color); }
+.contrato-marco { font-weight: bold; font-size: 1.1em; margin-bottom: 10px; }
+.contrato-detalles { color: var(--secondary-text); margin-bottom: 15px; font-size: 0.9em; }
+.contrato-acciones { display: flex; gap: 10px; }
+.contrato-acciones button { flex-grow: 1; padding: 10px; border: none; border-radius: 5px; color: white; font-weight: bold; cursor: pointer; }
+.contrato-acciones .cumplir-btn { background-color: var(--success-color); }
+.contrato-acciones .romper-btn { background-color: var(--fail-color); }
