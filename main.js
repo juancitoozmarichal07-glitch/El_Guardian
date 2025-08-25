@@ -4,7 +4,7 @@
 
 // --- CONFIGURACIÓN GLOBAL Y ESTADO ---
 const NOMBRE_USUARIO = "Juan";
-const GROK_API_KEY = "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";
+const GROK_API_KEY = import.meta.env.VITE_GROK_API_KEY;
 let estadoConversacion = { modo: 'libre', paso: '', datosPlan: {} };
 let sistema = { historialChat: [], contratos: [], racha: 0 };
 
