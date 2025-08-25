@@ -1,5 +1,5 @@
 // =================================================================
-// SCRIPT COMPLETO main.js (v.8.0 - La Visión Pura, Sin Gestor)
+// SCRIPT COMPLETO main.js (v.8.0 - La Visión Pura buena, Sin Gestor)
 // =================================================================
 
 // --- CONFIGURACIÓN GLOBAL Y ESTADO ---
