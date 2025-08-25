@@ -1,5 +1,5 @@
 /* =================================================================
-   CSS COMPLETO (v.8.0 - La Visión Pura buena, Sin Gestor)
+   CSS COMPLETO (v.8.0 - La Visión Pura, Sin Gestor)
    ================================================================= */
 :root {
     --background: #121212;
@@ -13,7 +13,7 @@
 }
 
 html, body {
-    height: 100dvh; margin: 0; padding: 0; overflow: hidden;
+    height: 100%; margin: 0; padding: 0; overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     background-color: var(--background); color: var(--primary-text);
 }
@@ -27,7 +27,7 @@ html, body {
 #app-container {
     display: flex;
     flex-direction: column;
-    height: 100dvh;
+    height: 100vh;
 }
 
 #screen-container {
@@ -117,41 +117,3 @@ html, body {
 .contrato-acciones button { flex-grow: 1; padding: 10px; border: none; border-radius: 5px; color: white; font-weight: bold; cursor: pointer; }
 .contrato-acciones .cumplir-btn { background-color: var(--success-color); }
 .contrato-acciones .romper-btn { background-color: var(--fail-color); }
-/* ===============================================
-   ANIMACIÓN PARA PUNTOS DE CARGA DINÁMICOS
-   =============================================== */
-
-/* Contenedor de los puntos */
-.loading-dots {
-    display: inline-block;
-}
-
-/* Definimos la animación que llamaremos 'blink' */
-@keyframes blink {
-    0% {
-        opacity: 0.2; /* Empieza casi invisible */
-    }
-    20% {
-        opacity: 1;   /* Se vuelve totalmente visible */
-    }
-    100% {
-        opacity: 0.2; /* Vuelve a ser casi invisible */
-    }
-}
-
-/* Aplicamos la animación a cada punto (cada <span>) */
-.loading-dots span {
-    animation-name: blink;          /* Usa la animación 'blink' que definimos */
-    animation-duration: 1.4s;       /* La animación completa dura 1.4 segundos */
-    animation-iteration-count: infinite; /* Se repite para siempre */
-    animation-fill-mode: both;      /* Mantiene el estilo final/inicial */
-}
-
-/* El truco: añadimos un pequeño retraso a cada punto */
-.loading-dots span:nth-child(2) {
-    animation-delay: 0.2s; /* El segundo punto empieza 0.2s más tarde */
-}
-
-.loading-dots span:nth-child(3) {
-    animation-delay: 0.4s; /* El tercer punto empieza 0.4s más tarde */
-}
