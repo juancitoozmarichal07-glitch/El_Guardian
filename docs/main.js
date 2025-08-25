@@ -112,7 +112,7 @@ function setupEventListeners(navBar, screens) {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             // RUTA CORREGIDA PARA GITHUB PAGES CON CARPETA /docs/
-            navigator.serviceWorker.register('/El_Guardian/service-worker.js')
+            navigator.serviceWorker.register('./service-worker.js')
                 .then(registration => {
                     console.log('Service Worker registrado con éxito.');
                     // Lógica para pedir permisos de notificación y sincronización periódica
