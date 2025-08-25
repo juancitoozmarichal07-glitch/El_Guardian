@@ -5,15 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guardian</title>
     
-    <!-- Enlace a la hoja de estilos -->
-    <link rel="stylesheet" href="style.css">
-
-    <!-- Enlaces para la PWA (Progressive Web App) -->
-    <link rel="manifest" href="manifest.json">
+    <!-- Enlaces a la hoja de estilos y al manifiesto -->
+    <link rel="stylesheet" href="./style.css">
+    <link rel="manifest" href="./manifest.json">
+    
     <meta name="theme-color" content="#1e1e1e">
 
 </head>
 <body>
+
     <!-- Pantalla de Arranque -->
     <div id="boot-container">
         <h1 id="main-title">Guardian</h1>
@@ -26,7 +26,7 @@
         <!-- El contenedor donde se mostrará la pantalla activa -->
         <main id="screen-container">
             
-            <!-- PANTALLA 1: CHAT (con su propio historial y su propia barra de entrada) -->
+            <!-- PANTALLA 1: CHAT -->
             <div id="chat-screen" class="screen active">
                 <div id="history"></div>
                 <div id="input-area">
@@ -39,21 +39,17 @@
             <!-- PANTALLA 2: LOGROS Y RACHAS -->
             <div id="logros-screen" class="screen">
                 <h1>Logros y Rachas</h1>
-                <div id="racha-container">
-                    <!-- El JS llenará esto con la racha -->
-                </div>
+                <div id="racha-container"></div>
             </div>
 
             <!-- PANTALLA 3: CALENDARIO DE CONTRATOS -->
             <div id="calendario-screen" class="screen">
                 <h1>Calendario de Contratos</h1>
-                <div id="lista-contratos-container">
-                    <!-- El JS llenará esto con los contratos -->
-                </div>
+                <div id="lista-contratos-container"></div>
             </div>
         </main>
 
-        <!-- La Barra de Navegación (lo único global en la parte inferior) -->
+        <!-- La Barra de Navegación -->
         <nav id="nav-bar">
             <button class="nav-button" data-target="logros-screen">🏆</button>
             <button class="nav-button active" data-target="chat-screen">💬</button>
@@ -61,7 +57,7 @@
         </nav>
     </div>
 
-    <!-- Enlace al script principal de JavaScript -->
-    <script src="main.js"></script>
+    <!-- Enlace al script principal de JavaScript (LA ÚNICA LLAMADA, Y LA CORRECTA) -->
+    <script src="./main.js"></script>
 </body>
 </html>
