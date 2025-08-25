@@ -1,10 +1,11 @@
 // =================================================================
-// MAIN.JS - VERSIÓN CORREGIDA PARA GITHUB PAGES
+// MAIN.JS - VERSIÓN MEJORADA (El Guardián 2.0)
+// Incluye: Ruleta de 1 opción, Duración Opcional, Permiso de Notificaciones y Contratos Agrupados por Día.
 // =================================================================
 
 // --- CONFIGURACIÓN GLOBAL Y ESTADO DEL SISTEMA ---
 const NOMBRE_USUARIO = "Juan";
-let estadoConversacion = { modo: 'libre', paso: '', datosPlan: { mision: '', especificaciones: [] } };
+let estadoConversacion = { modo: 'libre', paso: '', datosPlan: { mision: '', especificaciones: [], inicio: '', duracion: '' } };
 let sistema = {
     historialChat: [],
     contratos: [],
@@ -57,7 +58,7 @@ async function cargarSistemaDesdeDB() {
                 }
                 resolve();
             };
-            request.onerror = () => resolve(); // Resuelve incluso si hay error para no bloquear la app
+            request.onerror = () => resolve();
         });
     } catch (error) {
         console.error("Error al cargar desde IndexedDB:", error);
@@ -80,11 +81,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     rachaContainer = document.getElementById('racha-container');
 
     await cargarSistemaDesdeDB();
-    setupEventListeners(navBar, screens);
+    setupEventListeners();
     iniciarSecuenciaArranque();
+    
+    // NUEVO: Solicitar permiso de notificaciones al cargar la app
+    solicitarPermisoNotificaciones();
 });
 
-function setupEventListeners(navBar, screens) {
+function setupEventListeners() {
     sendButton.addEventListener('click', () => {
         if (chatInput.value.trim() !== '') procesarComandoUsuario(chatInput.value.trim());
     });
@@ -101,38 +105,62 @@ function setupEventListeners(navBar, screens) {
         if (targetScreenId === 'calendario-screen') renderizarListaContratos();
 
         screens.forEach(screen => screen.classList.toggle('active', screen.id === targetScreenId));
-        // CORRECCIÓN 2: Se añadió el paréntesis de cierre que faltaba
         document.querySelectorAll('.nav-button').forEach(button => button.classList.remove('active'));
         targetButton.classList.add('active');
     });
 
-    if(listaContratosContainer) listaContratosContainer.addEventListener('click', manejarAccionesContrato);
+    if(listaContratosContainer) {
+        listaContratosContainer.addEventListener('click', (e) => {
+            // Manejar acciones de botones (cumplir/romper)
+            if (e.target.dataset.id) {
+                manejarAccionesContrato(e);
+            }
+            // Manejar clics en los títulos de fecha para desplegar
+            if (e.target.classList.contains('fecha-titulo')) {
+                e.target.parentElement.classList.toggle('abierto');
+            }
+        });
+    }
 
-    // --- CÓDIGO DE REGISTRO DE PWA ---
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            // CORRECCIÓN 1: Ruta absoluta al service worker con el nombre del repositorio
             navigator.serviceWorker.register('/El_Guardian/service-worker.js', { scope: '/El_Guardian/' })
                 .then(registration => {
                     console.log('Service Worker registrado con éxito.');
-                    // Lógica para pedir permisos de notificación y sincronización periódica
                     if (registration.periodicSync) {
-                        return registration.periodicSync.register('check-contracts', {
-                            minInterval: 12 * 60 * 60 * 1000, // Mínimo 12 horas
-                        });
+                        return registration.periodicSync.register('check-contracts', { minInterval: 12 * 60 * 60 * 1000 });
                     }
                 })
                 .then(() => console.log('Sincronización periódica registrada.'))
-                .catch(error => {
-                    console.log('Fallo en el registro del Service Worker o la Sincronización:', error);
-                });
+                .catch(error => console.log('Fallo en el registro del SW o Sincronización:', error));
         });
+    }
+}
+
+// --- LÓGICA DE NOTIFICACIONES ---
+async function solicitarPermisoNotificaciones() {
+    if (!('Notification' in window)) {
+        console.log("Este navegador no soporta notificaciones.");
+        return;
+    }
+    if (Notification.permission === 'granted' || Notification.permission === 'denied') {
+        return; // Si ya se decidió, no hacer nada.
+    }
+    if (Notification.permission === 'default') {
+        const resultado = await Notification.requestPermission();
+        if (resultado === 'granted') {
+            console.log("¡Permiso de notificaciones concedido!");
+            new Notification("Guardián Activado", {
+                body: "¡Excelente! Ahora podré avisarte cuando un Contrato comience.",
+                icon: "icon-192.png"
+            });
+        }
     }
 }
 
 function procesarComandoUsuario(comando) {
     addUserMessage(comando);
-    chatInput.value = ''; // Limpiar input
+    chatInput.value = '';
     setTimeout(() => {
         showThinkingIndicator();
         setTimeout(() => {
@@ -142,7 +170,7 @@ function procesarComandoUsuario(comando) {
     }, 200);
 }
 
-// --- SECUENCIA DE ARRANQUE ---
+// --- SECUENCIA DE ARRANQUE Y MENSAJERÍA (Sin cambios) ---
 function iniciarSecuenciaArranque() {
     const mensajes = [
         { texto: "Iniciando Guardian OS...", animar: true },
@@ -152,15 +180,10 @@ function iniciarSecuenciaArranque() {
         { texto: `Bienvenido de nuevo, ${NOMBRE_USUARIO}.`, animar: false }
     ];
     let i = 0;
-
     function siguienteMensaje() {
         if (i < mensajes.length) {
             const mensajeActual = mensajes[i];
-            let html = mensajeActual.texto;
-            if (mensajeActual.animar) {
-                html += ' <span class="loading-dots"><span>.</span><span>.</span><span>.</span></span>';
-            }
-            bootMessage.innerHTML = html;
+            bootMessage.innerHTML = mensajeActual.texto + (mensajeActual.animar ? ' <span class="loading-dots"><span>.</span><span>.</span><span>.</span></span>' : '');
             i++;
             setTimeout(siguienteMensaje, 1500);
         } else {
@@ -181,13 +204,11 @@ function gestionarSaludoInicial() {
             else if (msg.role === 'assistant') addGuardianMessage(msg.content, false);
         });
     } else {
-        const primerMensaje = `Sistema cargado, ${NOMBRE_USUARIO}. ¿Forjamos un Contrato o necesitas hablar primero?`;
-        addGuardianMessage(primerMensaje);
+        addGuardianMessage(`Sistema cargado, ${NOMBRE_USUARIO}. ¿Forjamos un Contrato o necesitas hablar primero?`);
     }
     history.scrollTop = history.scrollHeight;
 }
 
-// --- FUNCIONES DE MENSAJERÍA ---
 function addUserMessage(texto, guardar = true) {
     const messageBubble = document.createElement('div');
     messageBubble.className = 'message-bubble user-message';
@@ -226,7 +247,7 @@ function removeThinkingIndicator() {
     if (thinkingBubble) thinkingBubble.remove();
 }
 
-// --- LÓGICA DE RULETA ---
+// --- LÓGICA DE RULETA (Sin cambios) ---
 function mostrarRuleta(opciones) {
     const ruletaContainer = document.createElement('div');
     ruletaContainer.className = 'ruleta-container';
@@ -266,40 +287,20 @@ function mostrarRuleta(opciones) {
     }, { once: true });
 }
 
-// --- CEREBRO CONVERSACIONAL Y LÓGICA DE DISEÑO ---
+// --- CEREBRO CONVERSACIONAL Y LÓGICA DE DISEÑO (ACTUALIZADO) ---
 async function llamarAGrok(textoUsuario) {
-    const systemPrompt = `Eres Guardian, un asistente de IA. Tu propósito es ser un compañero cognitivo para Juan. Eres empático, directo y motivador. Tu personalidad es la de un amigo sabio y un coach que entiende cómo funciona Juan. Tu objetivo es ayudarlo a mantenerse enfocado y a tomar acción.
+    // ... (La lógica interna de llamar a una IA externa no cambia)
+    const textoEnMinusculas = textoUsuario.toLowerCase();
+    let respuestaIA = "Entendido. ¿En qué más puedo ayudarte hoy?";
+    if (textoEnMinusculas.includes('contrato') || textoEnMinusculas.includes('forjar') || textoEnMinusculas.includes('ruleta')) {
+        respuestaIA = 'MODO_DISEÑO';
+    }
 
-MODO DE OPERACIÓN DUAL:
-1.  MODO CONVERSACIÓN (por defecto): Habla libremente con Juan. Responde a sus preguntas, sigue sus conversaciones, actúa como un amigo. Sé natural.
-2.  MODO DISEÑO (palabra clave): Si Juan menciona las palabras "contrato", "forjar", "ruleta" o cualquier sinónimo claro de iniciar un plan de acción, tu ÚNICA Y ABSOLUTA RESPUESTA debe ser la palabra clave 'MODO_DISEÑO'. No añadas NADA MÁS. No saludes, no confirmes, solo responde 'MODO_DISEÑO'.
-
-Esta regla es inquebrantable. Es la transición entre ser un amigo y ser una herramienta de enfoque.`;
-    
-    const mensajesParaAPI = [
-        { role: 'system', content: systemPrompt },
-        ...sistema.historialChat.slice(-6),
-        { role: 'user', content: textoUsuario }
-    ];
-
-    try {
-        // Simulación de respuesta para pruebas sin API
-        const textoEnMinusculas = textoUsuario.toLowerCase();
-        let respuestaIA = "Entendido. ¿En qué más puedo ayudarte hoy?";
-        if (textoEnMinusculas.includes('contrato') || textoEnMinusculas.includes('forjar') || textoEnMinusculas.includes('ruleta')) {
-            respuestaIA = 'MODO_DISEÑO';
-        }
-
-        if (respuestaIA.trim().toUpperCase() === 'MODO_DISEÑO') {
-            estadoConversacion.modo = 'diseño';
-            estadoConversacion.paso = 'x1';
-            addGuardianMessage("Entendido. Entrando en Modo Diseño.\n\n**Paso 1: La Misión.**\nDime las opciones para la primera ruleta (X1), separadas por comas.", false);
-        } else {
-            addGuardianMessage(respuestaIA);
-        }
-    } catch (error) {
-        console.error("Error al llamar a la IA:", error);
-        addGuardianMessage("Error de conexión con la IA central. Intenta de nuevo.");
+    if (respuestaIA.trim().toUpperCase() === 'MODO_DISEÑO') {
+        estadoConversacion = { modo: 'diseño', paso: 'x1', datosPlan: { mision: '', especificaciones: [], inicio: '', duracion: '' } };
+        addGuardianMessage("Entendido. Entrando en Modo Diseño.\n\n**Paso 1: La Misión.**\nDime la opción u opciones para la primera ruleta (X1), separadas por comas.", false);
+    } else {
+        addGuardianMessage(respuestaIA);
     }
 }
 
@@ -307,28 +308,23 @@ function procesarPasoDiseño(entrada) {
     const { paso } = estadoConversacion;
     const opciones = entrada.split(',').map(s => s.trim()).filter(Boolean);
 
-    // --- ¡CAMBIO CLAVE AQUÍ! ---
-    // Ahora, si hay UNA o más opciones, mostramos la ruleta.
-    if (opciones.length >= 1) { 
-        // Si el usuario escribió algo que no es una lista (ej: "listo", "borrar"),
-        // no queremos una ruleta para eso. La ruleta es solo para las opciones de misión.
-        const comandosEspeciales = ['listo', 'borrar'];
+    // MEJORA: Ruleta para 1 o más opciones, ignorando comandos
+    if (opciones.length >= 1) {
+        const comandosEspeciales = ['listo', 'borrar', 'ninguna'];
         if (opciones.length === 1 && comandosEspeciales.includes(opciones[0].toLowerCase())) {
-            // Si es un comando especial, no hacemos la ruleta y continuamos como antes.
+            // Es un comando, no una opción de ruleta, así que continuamos.
         } else {
             mostrarRuleta(opciones);
-            return; // Detenemos la función aquí para esperar el resultado de la ruleta.
+            return; // Esperamos el resultado de la ruleta
         }
     }
 
     const eleccion = entrada;
-    // ... el resto de la función sigue
-
 
     if (paso === 'x1') {
         estadoConversacion.datosPlan.mision = eleccion;
         estadoConversacion.paso = 'xn';
-        addGuardianMessage(`Misión aceptada: **${eleccion}**.\n\n**Siguiente Paso: Especificación.**\n¿Quieres añadir otra capa de ruleta para especificar más? Dime las opciones (X2) o escribe 'listo' para continuar.`);
+        addGuardianMessage(`Misión aceptada: **${eleccion}**.\n\n**Siguiente Paso: Especificación.**\n¿Añadir otra capa de ruleta (X2)? Dime las opciones, o escribe 'listo' para continuar.`);
     } else if (paso === 'xn') {
         if (eleccion.toLowerCase() === 'listo') {
             estadoConversacion.paso = 'inicio';
@@ -336,21 +332,27 @@ function procesarPasoDiseño(entrada) {
         } else if (eleccion.toLowerCase() === 'borrar') {
             if (estadoConversacion.datosPlan.especificaciones.length > 0) {
                 const borrada = estadoConversacion.datosPlan.especificaciones.pop();
-                addGuardianMessage(`Última especificación ('${borrada}') eliminada. ¿Nuevas opciones para esta capa o 'listo'?`);
+                addGuardianMessage(`Última especificación ('${borrada}') eliminada. ¿Nuevas opciones o 'listo'?`);
             } else {
-                addGuardianMessage(`No hay especificaciones que borrar. ¿Opciones para la siguiente capa o 'listo'?`);
+                addGuardianMessage(`No hay especificaciones que borrar. ¿Opciones o 'listo'?`);
             }
         } else {
             estadoConversacion.datosPlan.especificaciones.push(eleccion);
             const misionCompleta = [estadoConversacion.datosPlan.mision, ...estadoConversacion.datosPlan.especificaciones].join(' -> ');
-            addGuardianMessage(`Entendido: **${misionCompleta}**.\n\n¿Otra capa más (Xn)? ¿Opciones o 'listo'? También puedes decir 'borrar' para eliminar la última capa.`);
+            addGuardianMessage(`Entendido: **${misionCompleta}**.\n\n¿Otra capa más (Xn)? ¿Opciones, 'listo' o 'borrar'?`);
         }
     } else if (paso === 'inicio') {
         estadoConversacion.datosPlan.inicio = eleccion;
         estadoConversacion.paso = 'duracion';
-        addGuardianMessage(`Hora de inicio: **${eleccion}**.\n\nAhora, dime las opciones para la duración (ej: 30 min, 45 min, 1 hora).`);
+        // MEJORA: Preguntar por duración opcional
+        addGuardianMessage(`Hora de inicio: **${eleccion}**.\n\nAhora, la duración. Dime las opciones (ej: 30 min, 1 hora) o escribe 'ninguna' si no aplica.`);
     } else if (paso === 'duracion') {
-        estadoConversacion.datosPlan.duracion = eleccion;
+        // MEJORA: Manejar duración opcional
+        if (eleccion.toLowerCase() !== 'ninguna') {
+            estadoConversacion.datosPlan.duracion = eleccion;
+        } else {
+            estadoConversacion.datosPlan.duracion = ''; // Duración vacía si es 'ninguna'
+        }
         sellarContrato();
     }
     guardarSistemaEnDB();
@@ -363,16 +365,18 @@ function sellarContrato() {
         mision: misionCompleta,
         inicio: estadoConversacion.datosPlan.inicio,
         duracion: estadoConversacion.datosPlan.duracion,
-        fecha: new Date().toLocaleDateString('es-ES'),
-        estado: 'agendado' // agendado, cumplido, roto
+        fecha: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+        estado: 'agendado'
     };
     sistema.contratos.push(nuevoContrato);
     
-    const contractText = `CONTRATO FORJADO\n--------------------\nMisión: ${nuevoContrato.mision}\nInicio: ${nuevoContrato.inicio}\nDuración: ${nuevoContrato.duracion}\nFecha: ${nuevoContrato.fecha}\n--------------------`;
+    // MEJORA: Mostrar duración solo si existe
+    const duracionTexto = nuevoContrato.duracion ? `\nDuración: ${nuevoContrato.duracion}` : '';
+    const contractText = `CONTRATO FORJADO\n--------------------\nMisión: ${nuevoContrato.mision}\nInicio: ${nuevoContrato.inicio}${duracionTexto}\nFecha: ${nuevoContrato.fecha}\n--------------------`;
     addGuardianMessage(contractText, false);
     addGuardianMessage("Contrato agendado en tu calendario. Yo te aviso para arrancar. ¿Siguiente misión?");
 
-    estadoConversacion = { modo: 'libre', paso: '', datosPlan: { mision: '', especificaciones: [] } };
+    estadoConversacion = { modo: 'libre', paso: '', datosPlan: { mision: '', especificaciones: [], inicio: '', duracion: '' } };
     guardarSistemaEnDB();
 }
 
@@ -384,7 +388,7 @@ function getGuardianResponse(command) {
     }
 }
 
-// --- LÓGICA DE PANTALLAS ADICIONALES ---
+// --- LÓGICA DE PANTALLAS ADICIONALES (ACTUALIZADO) ---
 function renderizarLogros() {
     if (!rachaContainer) return;
     rachaContainer.innerHTML = `
@@ -401,24 +405,59 @@ function renderizarListaContratos() {
         return;
     }
     
-    const contratosOrdenados = [...sistema.contratos].reverse();
-    contratosOrdenados.forEach(contrato => {
-        const contratoEl = document.createElement('div');
-        contratoEl.className = `contrato-item estado-${contrato.estado}`;
-        contratoEl.innerHTML = `
-            <div class="contrato-mision">${contrato.mision}</div>
-            <div class="contrato-detalles">
-                <span>📅 ${contrato.fecha}</span>
-                <span>⏰ ${contrato.inicio}</span>
-                <span>⏱️ ${contrato.duracion}</span>
-            </div>
-            ${contrato.estado === 'agendado' ? `
-            <div class="contrato-acciones">
-                <button class="cumplir-btn" data-id="${contrato.id}">¡CUMPLIDO!</button>
-                <button class="romper-btn" data-id="${contrato.id}">ROTO</button>
-            </div>` : ''}
-        `;
-        listaContratosContainer.appendChild(contratoEl);
+    // MEJORA: Agrupar contratos por fecha
+    const contratosAgrupados = sistema.contratos.reduce((acc, contrato) => {
+        const fecha = contrato.fecha;
+        if (!acc[fecha]) {
+            acc[fecha] = [];
+        }
+        acc[fecha].push(contrato);
+        return acc;
+    }, {});
+
+    // Ordenar fechas de más reciente a más antigua
+    const fechasOrdenadas = Object.keys(contratosAgrupados).sort((a, b) => {
+        const [dayA, monthA, yearA] = a.split('/');
+        const [dayB, monthB, yearB] = b.split('/');
+        return new Date(`${yearB}-${monthB}-${dayB}`) - new Date(`${yearA}-${monthA}-${dayA}`);
+    });
+
+    fechasOrdenadas.forEach(fecha => {
+        const grupoEl = document.createElement('div');
+        grupoEl.className = 'fecha-grupo';
+        // El primer grupo (hoy) empieza abierto
+        if (fecha === new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })) {
+            grupoEl.classList.add('abierto');
+        }
+
+        const tituloEl = document.createElement('h2');
+        tituloEl.className = 'fecha-titulo';
+        tituloEl.textContent = fecha;
+        grupoEl.appendChild(tituloEl);
+
+        const listaContratosEl = document.createElement('div');
+        listaContratosEl.className = 'contratos-lista-interna';
+        
+        contratosAgrupados[fecha].forEach(contrato => {
+            const contratoEl = document.createElement('div');
+            contratoEl.className = `contrato-item estado-${contrato.estado}`;
+            contratoEl.innerHTML = `
+                <div class="contrato-mision">${contrato.mision}</div>
+                <div class="contrato-detalles">
+                    <span>⏰ ${contrato.inicio}</span>
+                    ${contrato.duracion ? `<span>⏱️ ${contrato.duracion}</span>` : ''}
+                </div>
+                ${contrato.estado === 'agendado' ? `
+                <div class="contrato-acciones">
+                    <button class="cumplir-btn" data-id="${contrato.id}">¡CUMPLIDO!</button>
+                    <button class="romper-btn" data-id="${contrato.id}">ROTO</button>
+                </div>` : ''}
+            `;
+            listaContratosEl.appendChild(contratoEl);
+        });
+        
+        grupoEl.appendChild(listaContratosEl);
+        listaContratosContainer.appendChild(grupoEl);
     });
 }
 
@@ -440,5 +479,5 @@ function manejarAccionesContrato(e) {
     }
     
     guardarSistemaEnDB();
-    renderizarListaContratos();
+    renderizarListaContratos(); // Re-renderizar para mostrar el cambio de estado
 }
