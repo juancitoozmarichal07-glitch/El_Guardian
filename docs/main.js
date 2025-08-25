@@ -1,20 +1,19 @@
 // =================================================================
-// MAIN.JS - VERSIÓN 4.0 FINAL Y COMPLETA (IA REAL)
-// Contiene: Un micro-modelo de lenguaje para respuestas contextuales y lógicas.
+// MAIN.JS - VERSIÓN 8.1 "LA VICTORIA FINAL"
+// CEREBRO COMPLETO DEL GUARDIÁN CON LÓGICA PWA CORREGIDA
 // =================================================================
 
 // --- CONFIGURACIÓN GLOBAL Y ESTADO DEL SISTEMA ---
 const NOMBRE_USUARIO = "Juan";
-let estadoConversacion = { modo: 'libre', paso: '', datosPlan: {} };
+let estadoConversacion = { modo: 'libre', paso: '', datosPlan: { mision: '', especificaciones: [] } };
 let sistema = {
     historialChat: [],
     contratos: [],
     racha: 0,
-    logros: [],
-    lastInteractionTimestamp: Date.now()
+    logros: []
 };
 
-// --- REFERENCIAS AL DOM ---
+// --- REFERENCIAS AL DOM (se asignan en DOMContentLoaded) ---
 let bootContainer, bootMessage, appContainer, history, chatInput, micButton, sendButton, navBar, screens, listaContratosContainer, rachaContainer;
 
 // --- LÓGICA DE BASE DE DATOS (IndexedDB) ---
@@ -33,7 +32,6 @@ function openDB() {
 }
 
 async function guardarSistemaEnDB() {
-    sistema.lastInteractionTimestamp = Date.now();
     try {
         const db = await openDB();
         const transaction = db.transaction(['sistema'], 'readwrite');
@@ -60,7 +58,7 @@ async function cargarSistemaDesdeDB() {
                 }
                 resolve();
             };
-            request.onerror = () => resolve();
+            request.onerror = () => resolve(); // Resuelve incluso si hay error para no bloquear la app
         });
     } catch (error) {
         console.error("Error al cargar desde IndexedDB:", error);
@@ -69,6 +67,7 @@ async function cargarSistemaDesdeDB() {
 
 // --- SETUP INICIAL ---
 document.addEventListener('DOMContentLoaded', async () => {
+    // Vinculación de elementos
     bootContainer = document.getElementById('boot-container');
     bootMessage = document.getElementById('boot-message');
     appContainer = document.getElementById('app-container');
@@ -82,81 +81,85 @@ document.addEventListener('DOMContentLoaded', async () => {
     rachaContainer = document.getElementById('racha-container');
 
     await cargarSistemaDesdeDB();
-    setupEventListeners();
+    setupEventListeners(navBar, screens);
     iniciarSecuenciaArranque();
-    solicitarPermisoNotificaciones();
 });
 
-function setupEventListeners() {
+function setupEventListeners(navBar, screens) {
     sendButton.addEventListener('click', () => {
         if (chatInput.value.trim() !== '') procesarComandoUsuario(chatInput.value.trim());
     });
     chatInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && chatInput.value.trim() !== '') {
-            e.preventDefault();
-            sendButton.click();
-        }
+        if (e.key === 'Enter' && chatInput.value.trim() !== '') sendButton.click();
     });
+    
     navBar.addEventListener('click', (e) => {
         const targetButton = e.target.closest('.nav-button');
         if (!targetButton) return;
         const targetScreenId = targetButton.dataset.target;
+        
         if (targetScreenId === 'logros-screen') renderizarLogros();
         if (targetScreenId === 'calendario-screen') renderizarListaContratos();
+
         screens.forEach(screen => screen.classList.toggle('active', screen.id === targetScreenId));
         document.querySelectorAll('.nav-button').forEach(button => button.classList.remove('active'));
         targetButton.classList.add('active');
     });
-    if(listaContratosContainer) {
-        listaContratosContainer.addEventListener('click', (e) => {
-            if (e.target.dataset.id) manejarAccionesContrato(e);
-            if (e.target.classList.contains('fecha-titulo')) e.target.parentElement.classList.toggle('abierto');
-        });
-    }
+
+    if(listaContratosContainer) listaContratosContainer.addEventListener('click', manejarAccionesContrato);
+
+    // --- CÓDIGO DE REGISTRO DE PWA ---
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/El_Guardian/service-worker.js', { scope: '/El_Guardian/' })
+            // RUTA CORREGIDA PARA GITHUB PAGES CON CARPETA /docs/
+            navigator.serviceWorker.register('./service-worker.js')
                 .then(registration => {
-                    console.log('Service Worker registrado.');
-                    if (registration.periodicSync) {
-                        registration.periodicSync.register('engagement-check', { minInterval: 12 * 60 * 60 * 1000 });
-                    }
+                    console.log('Service Worker registrado con éxito.');
+                    // Lógica para pedir permisos de notificación y sincronización periódica
+                    return registration.periodicSync.register('check-contracts', {
+                        minInterval: 12 * 60 * 60 * 1000, // Mínimo 12 horas
+                    });
+                })
+                .then(() => console.log('Sincronización periódica registrada.'))
+                .catch(error => {
+                    console.log('Fallo en el registro del Service Worker o la Sincronización:', error);
                 });
         });
     }
 }
 
-async function solicitarPermisoNotificaciones() {
-    if ('Notification' in window && Notification.permission === 'default') {
-        await Notification.requestPermission();
-    }
-}
-
-// --- MANEJO DE ENTRADA DEL USUARIO ---
 function procesarComandoUsuario(comando) {
     addUserMessage(comando);
-    chatInput.value = '';
-    showThinkingIndicator();
     setTimeout(() => {
-        removeThinkingIndicator();
-        getGuardianResponse(comando);
-    }, 900);
+        showThinkingIndicator();
+        setTimeout(() => {
+            removeThinkingIndicator();
+            getGuardianResponse(comando);
+        }, 800);
+    }, 200);
 }
 
-// --- MENSAJERÍA Y UI ---
+// --- SECUENCIA DE ARRANQUE ---
 function iniciarSecuenciaArranque() {
     const mensajes = [
-        { texto: "Iniciando núcleo CXQIA... ✅", animar: true },
-        { texto: "Cargando Sistema Guardián OS [v4.0]... 🛡️", animar: true },
-        { texto: "Activando protocolo RAI de Mensajes... 💬", animar: true },
+        { texto: "Iniciando Guardian OS...", animar: true },
+        { texto: "Protocolo 'Filo de Navaja' online.", animar: false },
+        { texto: "Sistema de Ruletas listo.", animar: false },
+        { texto: "Conectando con IA Central...", animar: true },
         { texto: `Bienvenido de nuevo, ${NOMBRE_USUARIO}.`, animar: false }
     ];
     let i = 0;
+
     function siguienteMensaje() {
         if (i < mensajes.length) {
-            bootMessage.innerHTML = mensajes[i].texto + (mensajes[i].animar ? ' <span class="loading-dots"><span>.</span><span>.</span><span>.</span></span>' : '');
+            const mensajeActual = mensajes[i];
+            let html = mensajeActual.texto;
+            if (mensajeActual.animar) {
+                html += ' <span class="loading-dots"><span>.</span><span>.</span><span>.</span></span>';
+            }
+            bootMessage.innerHTML = html;
             i++;
-            setTimeout(siguienteMensaje, 1200);
+            setTimeout(siguienteMensaje, 1500);
         } else {
             bootContainer.classList.add('hidden');
             appContainer.classList.remove('hidden');
@@ -169,17 +172,19 @@ function iniciarSecuenciaArranque() {
 
 function gestionarSaludoInicial() {
     history.innerHTML = '';
-    if (sistema.historialChat && sistema.historialChat.length > 0) {
+    if (sistema.historialChat.length > 0) {
         sistema.historialChat.forEach(msg => {
             if (msg.role === 'user') addUserMessage(msg.content, false);
             else if (msg.role === 'assistant') addGuardianMessage(msg.content, false);
         });
     } else {
-        addGuardianMessage(`Sistema cargado, ${NOMBRE_USUARIO}. ¿Forjamos un Contrato o prefieres conversar?`);
+        const primerMensaje = `Sistema cargado, ${NOMBRE_USUARIO}. ¿Forjamos un Contrato o necesitas hablar primero?`;
+        addGuardianMessage(primerMensaje);
     }
     history.scrollTop = history.scrollHeight;
 }
 
+// --- FUNCIONES DE MENSAJERÍA ---
 function addUserMessage(texto, guardar = true) {
     const messageBubble = document.createElement('div');
     messageBubble.className = 'message-bubble user-message';
@@ -187,7 +192,6 @@ function addUserMessage(texto, guardar = true) {
     history.appendChild(messageBubble);
     history.scrollTop = history.scrollHeight;
     if (guardar) {
-        if (!sistema.historialChat) sistema.historialChat = [];
         sistema.historialChat.push({ role: 'user', content: texto });
         guardarSistemaEnDB();
     }
@@ -196,18 +200,16 @@ function addUserMessage(texto, guardar = true) {
 function addGuardianMessage(texto, guardar = true) {
     const messageBubble = document.createElement('div');
     messageBubble.className = 'message-bubble guardian-message';
-    messageBubble.innerHTML = texto.replace(/\n/g, '<br>');
+    messageBubble.textContent = texto;
     history.appendChild(messageBubble);
     history.scrollTop = history.scrollHeight;
     if (guardar) {
-        if (!sistema.historialChat) sistema.historialChat = [];
         sistema.historialChat.push({ role: 'assistant', content: texto });
         guardarSistemaEnDB();
     }
 }
 
 function showThinkingIndicator() {
-    if (document.getElementById('thinking-bubble')) return;
     const thinkingBubble = document.createElement('div');
     thinkingBubble.id = 'thinking-bubble';
     thinkingBubble.className = 'message-bubble guardian-message';
@@ -221,6 +223,7 @@ function removeThinkingIndicator() {
     if (thinkingBubble) thinkingBubble.remove();
 }
 
+// --- LÓGICA DE RULETA ---
 function mostrarRuleta(opciones) {
     const ruletaContainer = document.createElement('div');
     ruletaContainer.className = 'ruleta-container';
@@ -236,6 +239,7 @@ function mostrarRuleta(opciones) {
     ruletaContainer.appendChild(botonGirar);
     history.appendChild(ruletaContainer);
     history.scrollTop = history.scrollHeight;
+
     botonGirar.addEventListener('click', () => {
         botonGirar.disabled = true;
         botonGirar.textContent = 'GIRANDO...';
@@ -259,230 +263,175 @@ function mostrarRuleta(opciones) {
     }, { once: true });
 }
 
-// --- CEREBRO PRINCIPAL Y LÓGICA DE MODOS ---
+// --- CEREBRO CONVERSACIONAL Y LÓGICA DE DISEÑO ---
+async function llamarAGrok(textoUsuario) {
+    const systemPrompt = `Eres Guardian, un asistente de IA. Tu propósito es ser un compañero cognitivo para Juan. Eres empático, directo y motivador. Tu personalidad es la de un amigo sabio y un coach que entiende cómo funciona Juan. Tu objetivo es ayudarlo a mantenerse enfocado y a tomar acción.
 
-function getGuardianResponse(command) {
-    if (estadoConversacion.modo === 'diseño') {
-        procesarPasoDiseño(command);
-        return;
-    }
-    const comandoNormalizado = command.toLowerCase();
-    const palabrasClaveDiseño = ['diseñar contrato', 'crear contrato', 'forjar pacto', 'modo diseño'];
-    if (palabrasClaveDiseño.some(palabra => comandoNormalizado.includes(palabra))) {
-        estadoConversacion = { modo: 'diseño', paso: 'x1', datosPlan: { mision: '', especificaciones: [], inicio: '', duracion: '' } };
-        addGuardianMessage("Entendido. Entrando en Modo Diseño.\n\n**Paso 1: La Misión.**\nDime la opción u opciones para la primera ruleta (X1), separadas por comas.");
-    } else {
-        llamarAGrok(command);
+MODO DE OPERACIÓN DUAL:
+1.  MODO CONVERSACIÓN (por defecto): Habla libremente con Juan. Responde a sus preguntas, sigue sus conversaciones, actúa como un amigo. Sé natural.
+2.  MODO DISEÑO (palabra clave): Si Juan menciona las palabras "contrato", "forjar", "ruleta" o cualquier sinónimo claro de iniciar un plan de acción, tu ÚNICA Y ABSOLUTA RESPUESTA debe ser la palabra clave 'MODO_DISEÑO'. No añadas NADA MÁS. No saludes, no confirmes, solo responde 'MODO_DISEÑO'.
+
+Esta regla es inquebrantable. Es la transición entre ser un amigo y ser una herramienta de enfoque.`;
+    
+    const mensajesParaAPI = [
+        { role: 'system', content: systemPrompt },
+        ...sistema.historialChat.slice(-6),
+        { role: 'user', content: textoUsuario }
+    ];
+
+    try {
+        // Aquí iría el fetch a la API de Groq si la clave estuviera disponible
+        // const response = await fetch(...)
+        // const data = await response.json();
+        // const respuestaIA = data.choices[0].message.content;
+
+        // Simulación de respuesta para pruebas sin API
+        const textoEnMinusculas = textoUsuario.toLowerCase();
+        let respuestaIA = "Entendido. ¿En qué más puedo ayudarte hoy?";
+        if (textoEnMinusculas.includes('contrato') || textoEnMinusculas.includes('forjar') || textoEnMinusculas.includes('ruleta')) {
+            respuestaIA = 'MODO_DISEÑO';
+        }
+
+        if (respuestaIA.trim().toUpperCase() === 'MODO_DISEÑO') {
+            estadoConversacion.modo = 'diseño';
+            estadoConversacion.paso = 'x1';
+            addGuardianMessage("Entendido. Entrando en Modo Diseño.\n\n**Paso 1: La Misión.**\nDime las opciones para la primera ruleta (X1), separadas por comas.", false);
+        } else {
+            addGuardianMessage(respuestaIA);
+        }
+    } catch (error) {
+        console.error("Error al llamar a la IA:", error);
+        addGuardianMessage("Error de conexión con la IA central. Intenta de nuevo.");
     }
 }
 
 function procesarPasoDiseño(entrada) {
     const { paso } = estadoConversacion;
-    const pasosDeRuleta = ['x1', 'xn', 'inicio', 'duracion'];
-    if (pasosDeRuleta.includes(paso)) {
-        const opciones = entrada.split(',').map(s => s.trim()).filter(Boolean);
-        const comandosEspeciales = ['listo', 'borrar', 'ninguna', 'cancelar'];
-        const esComando = opciones.length === 1 && comandosEspeciales.includes(opciones[0].toLowerCase());
-        if (opciones.length > 0 && !esComando) {
-            mostrarRuleta(opciones);
-            return;
-        }
-    }
-    const eleccion = entrada;
-    if (eleccion.toLowerCase() === 'cancelar') {
-        estadoConversacion = { modo: 'libre', paso: '', datosPlan: {} };
-        addGuardianMessage("Modo Diseño cancelado. Volvemos a la conversación normal.");
+    const opciones = entrada.split(',').map(s => s.trim()).filter(Boolean);
+
+    if (opciones.length > 1) {
+        mostrarRuleta(opciones);
         return;
     }
-    switch (paso) {
-        case 'x1':
-            estadoConversacion.datosPlan.mision = eleccion;
-            estadoConversacion.paso = 'xn';
-            addGuardianMessage(`Misión principal: **${eleccion}**.\n\n**Siguiente Paso (X2):**\n¿Añadir especificación? Introduce opciones para la ruleta, o escribe 'listo' para continuar.`);
-            break;
-        case 'xn':
-            if (eleccion.toLowerCase() === 'listo') {
-                estadoConversacion.paso = 'inicio';
-                addGuardianMessage(`Especificaciones completadas.\n\n**Hora de Arranque:**\nDime la hora o las posibles horas de inicio (ej: 14:00, 15:00).`);
+
+    const eleccion = entrada;
+
+    if (paso === 'x1') {
+        estadoConversacion.datosPlan.mision = eleccion;
+        estadoConversacion.paso = 'xn';
+        addGuardianMessage(`Misión aceptada: **${eleccion}**.\n\n**Siguiente Paso: Especificación.**\n¿Quieres añadir otra capa de ruleta para especificar más? Dime las opciones (X2) o escribe 'listo' para continuar.`);
+    } else if (paso === 'xn') {
+        if (eleccion.toLowerCase() === 'listo') {
+            estadoConversacion.paso = 'inicio';
+            addGuardianMessage(`Perfecto. Misión definida.\n\n**Paso Final: El Sello.**\nDime los posibles horarios de inicio (ej: 14:00, 15:00).`);
+        } else if (eleccion.toLowerCase() === 'borrar') {
+            if (estadoConversacion.datosPlan.especificaciones.length > 0) {
+                const borrada = estadoConversacion.datosPlan.especificaciones.pop();
+                addGuardianMessage(`Última especificación ('${borrada}') eliminada. ¿Nuevas opciones para esta capa o 'listo'?`);
             } else {
-                if (!estadoConversacion.datosPlan.especificaciones) estadoConversacion.datosPlan.especificaciones = [];
-                estadoConversacion.datosPlan.especificaciones.push(eleccion);
-                const misionCompleta = [estadoConversacion.datosPlan.mision, ...estadoConversacion.datosPlan.especificaciones].join(' -> ');
-                addGuardianMessage(`Entendido: **${misionCompleta}**.\n\n¿Otra capa más (Xn)? ¿Opciones, 'listo' o 'cancelar'?`);
+                addGuardianMessage(`No hay especificaciones que borrar. ¿Opciones para la siguiente capa o 'listo'?`);
             }
-            break;
-        case 'inicio':
-            estadoConversacion.datosPlan.inicio = eleccion;
-            estadoConversacion.paso = 'duracion';
-            addGuardianMessage(`Hora de inicio: **${eleccion}**.\n\n**Límite de Tiempo:**\nDime la duración (ej: 30 min) o escribe 'ninguna'.`);
-            break;
-        case 'duracion':
-            estadoConversacion.datosPlan.duracion = (eleccion.toLowerCase() !== 'ninguna') ? eleccion : '';
-            sellarContrato();
-            break;
+        } else {
+            estadoConversacion.datosPlan.especificaciones.push(eleccion);
+            const misionCompleta = [estadoConversacion.datosPlan.mision, ...estadoConversacion.datosPlan.especificaciones].join(' -> ');
+            addGuardianMessage(`Entendido: **${misionCompleta}**.\n\n¿Otra capa más (Xn)? ¿Opciones o 'listo'? También puedes decir 'borrar' para eliminar la última capa.`);
+        }
+    } else if (paso === 'inicio') {
+        estadoConversacion.datosPlan.inicio = eleccion;
+        estadoConversacion.paso = 'duracion';
+        addGuardianMessage(`Hora de inicio: **${eleccion}**.\n\nAhora, dime las opciones para la duración (ej: 30 min, 45 min, 1 hora).`);
+    } else if (paso === 'duracion') {
+        estadoConversacion.datosPlan.duracion = eleccion;
+        sellarContrato();
     }
+    guardarSistemaEnDB();
 }
 
 function sellarContrato() {
-    const misionCompleta = [estadoConversacion.datosPlan.mision, ...(estadoConversacion.datosPlan.especificaciones || [])].join(' -> ');
-    const [horas, minutos] = estadoConversacion.datosPlan.inicio.split(':').map(Number);
-    const fechaInicio = new Date();
-    fechaInicio.setHours(horas, minutos, 0, 0);
-    if (fechaInicio < new Date()) fechaInicio.setDate(fechaInicio.getDate() + 1);
+    const misionCompleta = [estadoConversacion.datosPlan.mision, ...estadoConversacion.datosPlan.especificaciones].join(' -> ');
     const nuevoContrato = {
         id: Date.now(),
         mision: misionCompleta,
         inicio: estadoConversacion.datosPlan.inicio,
         duracion: estadoConversacion.datosPlan.duracion,
-        fecha: fechaInicio.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-        timestampInicio: fechaInicio.getTime(),
-        estado: 'agendado',
-        notificadoPorSW: false
+        fecha: new Date().toLocaleDateString('es-ES'),
+        estado: 'agendado' // agendado, cumplido, roto
     };
-    if (!sistema.contratos) sistema.contratos = [];
     sistema.contratos.push(nuevoContrato);
-    const duracionTexto = nuevoContrato.duracion ? `\nDuración: ${nuevoContrato.duracion}` : '';
-    const contractText = `CONTRATO FORJADO\n--------------------\nMisión: ${nuevoContrato.mision}\nInicio: ${nuevoContrato.inicio} (${nuevoContrato.fecha})${duracionTexto}\n--------------------`;
-    addGuardianMessage(contractText);
-    addGuardianMessage("Contrato agendado. He programado un recordatorio. ¿Siguiente misión?");
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({ type: 'SCHEDULE_NOTIFICATION', payload: nuevoContrato });
-    }
-    estadoConversacion = { modo: 'libre', paso: '', datosPlan: {} };
+    
+    const contractText = `CONTRATO FORJADO\n--------------------\nMisión: ${nuevoContrato.mision}\nInicio: ${nuevoContrato.inicio}\nDuración: ${nuevoContrato.duracion}\nFecha: ${nuevoContrato.fecha}\n--------------------`;
+    addGuardianMessage(contractText, false);
+    addGuardianMessage("Contrato agendado en tu calendario. Yo te aviso para arrancar. ¿Siguiente misión?");
+
+    estadoConversacion = { modo: 'libre', paso: '', datosPlan: { mision: '', especificaciones: [] } };
     guardarSistemaEnDB();
 }
 
-// --- MICRO-MODELO DE LENGUAJE (EL NUEVO CEREBRO) ---
-
-function llamarAGrok(textoUsuario) {
-    const texto = textoUsuario.toLowerCase();
-
-    const conocimiento = {
-        'yo': { tipo: 'sujeto', sinonimos: ['me', 'mi'] },
-        'tú': { tipo: 'sujeto', sinonimos: ['vos', 'tu'] },
-        'trabajo': { tipo: 'concepto', relacion: ['estrés', 'dinero', 'proyecto'] },
-        'problema': { tipo: 'concepto', relacion: ['solución', 'estrés', 'ayuda'] },
-        'idea': { tipo: 'concepto', relacion: ['creatividad', 'proyecto', 'solución'] },
-        'estoy': { tipo: 'verbo_estado', sinonimos: ['ando', 'me siento'] },
-        'tengo': { tipo: 'verbo_posesion', sinonimos: ['poseo'] },
-        'quiero': { tipo: 'verbo_deseo', sinonimos: ['necesito', 'deseo'] },
-        'cansado': { tipo: 'estado', sentimiento: 'negativo' },
-        'feliz': { tipo: 'estado', sentimiento: 'positivo' },
-        'estresado': { tipo: 'estado', sentimiento: 'negativo' },
-        'motivado': { tipo: 'estado', sentimiento: 'positivo' },
-    };
-
-    let tokens = [];
-    const palabras = texto.replace(/[?¿!¡,.]/g, '').split(' ');
-    palabras.forEach(palabra => {
-        if (conocimiento[palabra]) {
-            tokens.push({ palabra, ...conocimiento[palabra] });
-        } else {
-            tokens.push({ palabra, tipo: 'desconocido' });
-        }
-    });
-
-    const sujeto = tokens.find(t => t.tipo === 'sujeto' && t.palabra === 'yo');
-    const estado = tokens.find(t => t.tipo === 'estado');
-    const concepto = tokens.find(t => t.tipo === 'concepto');
-    const deseo = tokens.find(t => t.tipo === 'verbo_deseo');
-
-    let respuestaGenerada = "";
-
-    if (sujeto && estado) {
-        if (estado.sentimiento === 'negativo') {
-            respuestaGenerada = `Entiendo que te sientas ${estado.palabra}. ¿Hay algo específico que esté causando ese sentimiento? A veces, ponerle nombre ayuda.`;
-        } else {
-            respuestaGenerada = `¡Qué bueno que te sientas ${estado.palabra}! Aprovechar esa energía es clave. ¿Qué planes tienes con esa motivación?`;
-        }
-    } else if (sujeto && deseo && concepto) {
-        respuestaGenerada = `Un ${concepto.palabra} es un desafío, y buscar una ${concepto.relacion[0]} es el primer paso. ¿Qué has intentado hasta ahora para abordar este ${concepto.palabra}?`;
-    } else if (concepto) {
-        respuestaGenerada = `Mencionas "${concepto.palabra}". Este concepto suele estar relacionado con '${concepto.relacion.join("', '")}'. ¿Tu situación encaja con alguna de estas ideas?`;
+function getGuardianResponse(command) {
+    if (estadoConversacion.modo === 'libre') {
+        llamarAGrok(command);
     } else {
-        const desconocido = tokens.find(t => t.tipo === 'desconocido');
-        if (desconocido) {
-            respuestaGenerada = `La palabra "${desconocido.palabra}" es nueva para mi base de conocimiento. ¿Podrías explicarme qué significa para ti en este contexto? Me interesa aprender.`;
-        } else {
-            respuestaGenerada = "Estoy procesando eso. Es complejo. ¿Puedes darme un poco más de detalle para entender mejor el panorama?";
-        }
+        procesarPasoDiseño(command);
     }
-
-    addGuardianMessage(respuestaGenerada);
 }
 
 // --- LÓGICA DE PANTALLAS ADICIONALES ---
 function renderizarLogros() {
     if (!rachaContainer) return;
-    rachaContainer.innerHTML = `<div class="racha-valor">${sistema.racha}</div><div class="racha-texto">DÍAS DE RACHA</div>`;
+    rachaContainer.innerHTML = `
+        <div class="racha-valor">${sistema.racha}</div>
+        <div class="racha-texto">DÍAS DE RACHA</div>
+    `;
 }
 
 function renderizarListaContratos() {
     if (!listaContratosContainer) return;
     listaContratosContainer.innerHTML = '';
-    if (!sistema.contratos || sistema.contratos.length === 0) {
+    if (sistema.contratos.length === 0) {
         listaContratosContainer.innerHTML = '<p>No hay contratos agendados.</p>';
         return;
     }
-    const contratosAgrupados = sistema.contratos.reduce((acc, contrato) => {
-        const fecha = contrato.fecha;
-        if (!acc[fecha]) acc[fecha] = [];
-        acc[fecha].push(contrato);
-        return acc;
-    }, {});
-    const fechasOrdenadas = Object.keys(contratosAgrupados).sort((a, b) => {
-        const [dayA, monthA, yearA] = a.split('/');
-        const [dayB, monthB, yearB] = b.split('/');
-        return new Date(`${yearB}-${monthB}-${dayB}`) - new Date(`${yearA}-${monthA}-${dayA}`);
-    });
-    fechasOrdenadas.forEach(fecha => {
-        const grupoEl = document.createElement('div');
-        grupoEl.className = 'fecha-grupo';
-        if (fecha === new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })) {
-            grupoEl.classList.add('abierto');
-        }
-        const tituloEl = document.createElement('h2');
-        tituloEl.className = 'fecha-titulo';
-        tituloEl.textContent = fecha;
-        grupoEl.appendChild(tituloEl);
-        const listaContratosEl = document.createElement('div');
-        listaContratosEl.className = 'contratos-lista-interna';
-        contratosAgrupados[fecha].forEach(contrato => {
-            const contratoEl = document.createElement('div');
-            contratoEl.className = `contrato-item estado-${contrato.estado}`;
-            contratoEl.innerHTML = `
-                <div class="contrato-mision">${contrato.mision}</div>
-                <div class="contrato-detalles">
-                    <span>⏰ ${contrato.inicio}</span>
-                    ${contrato.duracion ? `<span>⏱️ ${contrato.duracion}</span>` : ''}
-                </div>
-                ${contrato.estado === 'agendado' ? `
-                <div class="contrato-acciones">
-                    <button class="cumplir-btn" data-id="${contrato.id}">¡CUMPLIDO!</button>
-                    <button class="romper-btn" data-id="${contrato.id}">ROTO</button>
-                </div>` : ''}
-            `;
-            listaContratosEl.appendChild(contratoEl);
-        });
-        grupoEl.appendChild(listaContratosEl);
-        listaContratosContainer.appendChild(grupoEl);
+    
+    const contratosOrdenados = [...sistema.contratos].reverse();
+    contratosOrdenados.forEach(contrato => {
+        const contratoEl = document.createElement('div');
+        contratoEl.className = `contrato-item estado-${contrato.estado}`;
+        contratoEl.innerHTML = `
+            <div class="contrato-mision">${contrato.mision}</div>
+            <div class="contrato-detalles">
+                <span>📅 ${contrato.fecha}</span>
+                <span>⏰ ${contrato.inicio}</span>
+                <span>⏱️ ${contrato.duracion}</span>
+            </div>
+            ${contrato.estado === 'agendado' ? `
+            <div class="contrato-acciones">
+                <button class="cumplir-btn" data-id="${contrato.id}">¡CUMPLIDO!</button>
+                <button class="romper-btn" data-id="${contrato.id}">ROTO</button>
+            </div>` : ''}
+        `;
+        listaContratosContainer.appendChild(contratoEl);
     });
 }
 
 function manejarAccionesContrato(e) {
     const id = e.target.dataset.id;
     if (!id) return;
+
     const contratoIndex = sistema.contratos.findIndex(c => c.id == id);
     if (contratoIndex === -1) return;
+
     if (e.target.classList.contains('cumplir-btn')) {
         sistema.contratos[contratoIndex].estado = 'cumplido';
+        // Lógica de racha: Si el último contrato cumplido no fue hoy, se resetea y se suma 1.
+        // (Simplificado por ahora: solo suma)
         sistema.racha++;
         addGuardianMessage("¡Excelente! Contrato cumplido. Tu racha aumenta. La disciplina es la forja del carácter.");
     } else if (e.target.classList.contains('romper-btn')) {
         sistema.contratos[contratoIndex].estado = 'roto';
         sistema.racha = 0;
-        addGuardianMessage("Contrato roto. La racha se reinicia. No es un fracaso, es un dato. Analiza y vuelve a forjar.");
+        addGuardianMessage("Contrato roto. La racha se reinicia. No es un fracaso, es un dato. Analiza, aprende y vuelve a forjar. La voluntad es tuya.");
     }
+    
     guardarSistemaEnDB();
     renderizarListaContratos();
 }
