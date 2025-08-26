@@ -153,20 +153,44 @@ function mostrarRuleta(opciones) { /* ...código idéntico... */ }
 
 // --- CEREBRO PRINCIPAL Y LÓGICA DE MODOS ---
 
+// =================================================================
+// REEMPLAZA ESTA ÚNICA FUNCIÓN EN TU main.js
+// VERSIÓN CON LÓGICA DE DECISIÓN CORREGIDA Y BLINDADA
+// =================================================================
+
 function getGuardianResponse(command) {
+    const comandoNormalizado = command.toLowerCase().trim();
+
+    // Condición 1: ¿Ya estamos DENTRO del modo diseño?
     if (estadoConversacion.modo === 'diseño') {
         procesarPasoDiseño(command);
-        return;
+        return; // Termina la ejecución aquí.
     }
-    const comandoNormalizado = command.toLowerCase();
-    const palabrasClaveDiseño = ['diseñar contrato', 'crear contrato', 'forjar pacto', 'modo diseño'];
-    if (palabrasClaveDiseño.some(palabra => comandoNormalizado.includes(palabra))) {
+
+    // Condición 2: ¿El usuario quiere ENTRAR al modo diseño?
+    // Usamos una lista de frases exactas para evitar falsos positivos.
+    const palabrasClaveDiseño = [
+        'diseñar contrato',
+        'crear contrato',
+        'forjar contrato',
+        'forjar un pacto',
+        'modo diseño',
+        'iniciar diseño'
+    ];
+
+    // Comprobamos si el comando del usuario ES una de estas frases.
+    if (palabrasClaveDiseño.includes(comandoNormalizado)) {
+        // Reiniciamos el estado para empezar un diseño limpio.
         estadoConversacion = { modo: 'diseño', paso: 'x1', datosPlan: { mision: '', especificaciones: [] } };
         addGuardianMessage("Entendido. Entrando en Modo Diseño.\n\n**Paso 1: La Misión.**\nDime la opción u opciones para la primera ruleta (X1), separadas por comas.");
-    } else {
-        llamarAGrok(command);
+        return; // Termina la ejecución aquí.
     }
+
+    // Condición 3 (Por defecto): Si ninguna de las anteriores es cierta, conversamos.
+    // Esta es la ruta que tomará "Hola", "Buenas", etc.
+    llamarAGrok(command);
 }
+
 
 function procesarPasoDiseño(entrada) {
     const { paso } = estadoConversacion;
