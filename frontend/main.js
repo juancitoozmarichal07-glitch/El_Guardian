@@ -6,7 +6,8 @@
 
 // --- CONFIGURACIÓN GLOBAL Y ESTADO DEL CLIENTE ---
 const NOMBRE_USUARIO = "Juan";
-const const API_URL = 'https://el-guardian.onrender.com/execute';
+// ¡LA ÚNICA LÍNEA A CAMBIAR!
+const API_URL = '/execute';
 let estadoConversacion = { modo: 'libre' }; // Estado inicial simple
 
 // --- REFERENCIAS AL DOM (se asignan al arrancar) ---
