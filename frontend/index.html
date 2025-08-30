@@ -5,14 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guardian</title>
     
-    <!-- 
-      CORRECCIÓN CLAVE:
-      Añadimos "./" al principio de las rutas. 
-      Esto le dice al navegador que busque los archivos en la misma carpeta 
-      donde está el index.html, que es como funciona Spck Editor.
-    -->
-    <link rel="stylesheet" href="./style.css">
-    <link rel="manifest" href="./manifest.json">
+    <!-- Rutas corregidas para ser compatibles con servidores profesionales (sin ./) -->
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
     
     <meta name="theme-color" content="#1e1e1e">
 
@@ -62,10 +57,7 @@
         </nav>
     </div>
 
-    <!-- 
-      CORRECCIÓN CLAVE:
-      También añadimos "./" a la ruta del script.
-    -->
-    <script src="./main.js"></script>
+    <!-- Ruta del script corregida (sin ./) -->
+    <script src="main.js"></script>
 </body>
 </html>
