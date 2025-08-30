@@ -98,50 +98,55 @@ function procesarComandoUsuario(comando) {
 }
 
 // --- FUNCIÓN PRINCIPAL DE COMUNICACIÓN CON EL CEREBRO A.L.E. ---
-async function llamarALE(comando) {
-    // Mostramos el indicador de "pensando" inmediatamente
+// =================================================================
+// FUNCIÓN DE COMUNICACIÓN CON EL SERVIDOR (VERSIÓN FINAL Y ROBUSTA)
+// =================================================================
+async function llamarALE(comando, estadoActual) {
+    // Muestra el indicador de "pensando" para que el usuario sepa que algo está pasando.
     showThinkingIndicator();
 
     try {
-        const respuestaServidor = await fetch(URL_ALE_SERVER, {
+        // Intenta comunicarse con el servidor en la ruta /execute.
+        const response = await fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                skillset_target: "guardian",
                 comando: comando,
-                skillset_target: 'guardian', // Nos identificamos como el cliente "guardian"
-                estado_conversacion: estadoConversacion
+                estado_conversacion: estadoActual
             })
         });
 
-        if (!respuestaServidor.ok) {
-            throw new Error('Error de red o del servidor A.L.E.');
+        // Si la respuesta del servidor no es un "200 OK" (o similar),
+        // significa que algo falló en el lado del servidor.
+        if (!response.ok) {
+            // Creamos un error con el código de estado para saber qué pasó.
+            throw new Error(`Error del Servidor: ${response.status}`);
         }
 
-        const respuesta = await respuestaServidor.json();
-
-        // Guardamos el nuevo estado de conversación que nos manda el cerebro
-        if (respuesta.nuevo_estado) {
-            estadoConversacion = respuesta.nuevo_estado;
-        }
-
-        // Si el cerebro nos da una acción específica para la UI...
-        if (respuesta.accion_ui) {
-            if (respuesta.accion_ui === 'MOSTRAR_RULETA') {
-                removeThinkingIndicator();
-                mostrarRuletaVisual(respuesta.opciones_ruleta);
-            }
-        } 
-        // Si no hay acción, es un mensaje de texto normal.
-        else if (respuesta.mensaje_para_ui) {
-            addGuardianMessage(respuesta.mensaje_para_ui);
-        }
+        // Si todo fue bien, convierte la respuesta a formato JSON.
+        const data = await response.json();
+        
+        // Quita el indicador de "pensando".
+        removeThinkingIndicator();
+        
+        // Envía los datos a la función que los procesará.
+        procesarRespuestaALE(data);
 
     } catch (error) {
-        console.error("Error en llamarALE:", error);
+        // Si CUALQUIER cosa en el bloque 'try' falla (la conexión, la conversión a JSON, etc.),
+        // este bloque 'catch' se activará.
+        console.error("Error crítico al llamar a A.L.E.:", error);
+        
+        // Quita el indicador de "pensando" para no dejarlo colgado.
         removeThinkingIndicator();
-        addGuardianMessage("Error de conexión. Asegúrate de que el servidor A.L.E. esté funcionando en Pydroid 3.", false);
+        
+        // Muestra un mensaje de error claro y útil en la interfaz del chat.
+        // Este es el mensaje que viste, pero ahora actualizado.
+        addGuardianMessage(`Error de conexión. El núcleo en Render podría estar despertando. Por favor, espera un minuto y refresca la página. (Detalle: ${error.message})`);
     }
 }
+
 
 // --- FUNCIONES PARA MANEJAR LA INTERFAZ DE CHAT ---
 
