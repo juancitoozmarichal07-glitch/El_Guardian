@@ -61,14 +61,11 @@ class Guardian:
         """Maneja la conversación general usando un modelo de IA externo."""
         try:
             self.historial_chat.append({"role": "user", "content": comando})
-            prompt = [{"role": "system", "content": "Eres el Guardián, una IA compañera de Juan. Eres directo, sabio y motivador. Tu objetivo es ayudarlo a mantener el enfoque."}]
-            
-            # NOTA: Se eliminó el 'provider' para que use el que funcione en tu versión de g4f.
-            respuesta_ia = await g4f.ChatCompletion.create_async(
-                model=g4f.models.default,
-                messages=prompt + self.historial_chat
-            )
-            
+            # LA NUEVA VERSIÓN A PRUEBA de ERRORES
+respuesta_ia = await g4f.ChatCompletion.create_async(
+    model=g4f.models.default,
+    messages=[{"role": "user", "content": f"Eres el Guardián, una IA compañera de Juan. Eres directo, sabio y motivador. El usuario dice: '{comando}'"}]
+)
             if not respuesta_ia: raise ValueError("Respuesta de IA vacía.")
             
             self.historial_chat.append({"role": "assistant", "content": respuesta_ia})
