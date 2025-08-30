@@ -6,7 +6,7 @@
 
 // --- CONFIGURACIÓN GLOBAL Y ESTADO DEL CLIENTE ---
 const NOMBRE_USUARIO = "Juan";
-const URL_ALE_SERVER = 'http://127.0.0.1:5000/execute';
+const const API_URL = 'https://el-guardian.onrender.com/execute';
 let estadoConversacion = { modo: 'libre' }; // Estado inicial simple
 
 // --- REFERENCIAS AL DOM (se asignan al arrancar) ---
