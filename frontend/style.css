@@ -2,6 +2,66 @@
    CSS COMPLETO - VERSIÓN 9.0 "PUESTA A PUNTO"
    ================================================================= */
 
+/* =================================================================
+   CSS RESET Y NORMALIZACIÓN - Para que se vea igual en todos lados
+   ================================================================= */
+
+/* 1. Usamos un box-sizing más intuitivo para todos los elementos. */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* 2. Eliminamos los márgenes y paddings por defecto de la mayoría de elementos. */
+body, h1, h2, h3, h4, p, figure, blockquote, dl, dd {
+  margin: 0;
+}
+
+/* 3. Hacemos que los elementos de lista no tengan estilo por defecto. */
+ul[role='list'],
+ol[role='list'] {
+  list-style: none;
+}
+
+/* 4. Configuramos los valores por defecto del body. */
+body {
+  min-height: 100vh;
+  text-rendering: optimizeSpeed;
+  line-height: 1.5;
+}
+
+/* 5. Hacemos que las imágenes sean más fáciles de manejar. */
+img, picture {
+  max-width: 100%;
+  display: block;
+}
+
+/* 6. Forzamos a que los inputs y botones hereden la fuente. */
+input, button, textarea, select {
+  font: inherit;
+}
+
+/* 7. Eliminamos las animaciones para gente que prefiere no verlas. */
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+   scroll-behavior: auto;
+  }
+  
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* =================================================================
+   FIN DEL RESET - TUS ESTILOS EMPIEZAN AQUÍ
+   ================================================================= */
+
+/* :root { ... y el resto de tu CSS ... } */
+
 /* --- VARIABLES GLOBALES DE DISEÑO --- */
 :root {
     --background: #121212;
