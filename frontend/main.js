@@ -2,11 +2,18 @@
 // MAIN.JS - VERSIÓN FINAL MONOLITO (COMPLETA Y CORRECTA)
 // =================================================================
 
-// --- CONFIGURACIÓN GLOBAL Y ESTADO ---
+// ... (al principio de tu main.js)
+
+// --- CONFIGURACIÓN GLOBAL Y ESTADO DEL CLIENTE ---
 const NOMBRE_USUARIO = "Juan";
-// La API_URL ahora es una ruta relativa, porque el frontend y el backend viven en el mismo servidor.
-const API_URL = '/execute';
-let estadoConversacion = { modo: 'libre' };
+
+// ESTA ES LA LÍNEA QUE DEBES CAMBIAR:
+const URL_ALE_SERVER = 'https://el-guardian.onrender.com/execute';
+
+let estadoConversacion = { modo: 'libre' }; // Estado inicial simple
+
+// ... (el resto del archivo se queda exactamente igual)
+
 
 // --- REFERENCIAS AL DOM ---
 let bootContainer, bootMessage, appContainer, history, chatInput, sendButton, navBar, screens;
@@ -22,10 +29,10 @@ document.addEventListener('DOMContentLoaded', () => {
     sendButton = document.getElementById('send-button');
     navBar = document.getElementById('nav-bar');
     screens = document.querySelectorAll('.screen');
-
+    
     // 2. Configuramos los listeners de los botones
     setupEventListeners();
-
+    
     // 3. Iniciamos la secuencia de arranque
     iniciarSecuenciaArranque();
 });
@@ -39,7 +46,7 @@ function setupEventListeners() {
             chatInput.value = '';
         }
     });
-
+    
     chatInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             sendButton.click();
@@ -65,7 +72,7 @@ function iniciarSecuenciaArranque() {
         `Bienvenido de nuevo, ${NOMBRE_USUARIO}.`
     ];
     let i = 0;
-
+    
     function mostrarSiguienteMensaje() {
         if (i < mensajes.length) {
             bootMessage.textContent = mensajes[i];
@@ -79,32 +86,121 @@ function iniciarSecuenciaArranque() {
     mostrarSiguienteMensaje();
 }
 
+// --- FUNCIÓN PARA LA RULETA VISUAL ---
+// Pega esta función completa en tu archivo main.js
+
+function mostrarRuleta(opciones) {
+    // 1. Creamos el contenedor visual de la ruleta en el chat.
+    const ruletaContainer = document.createElement('div');
+    ruletaContainer.className = 'ruleta-container'; // Usa los estilos que ya tienes en style.css
+    
+    // 2. Creamos un "botón" de texto para cada opción.
+    opciones.forEach(opcion => {
+        const opcionEl = document.createElement('div');
+        opcionEl.className = 'ruleta-opcion';
+        opcionEl.textContent = opcion;
+        ruletaContainer.appendChild(opcionEl);
+    });
+    
+    // 3. Añadimos el contenedor completo al historial del chat.
+    history.appendChild(ruletaContainer);
+    history.scrollTop = history.scrollHeight;
+
+    // 4. Desactivamos el input del usuario para que no pueda escribir mientras la ruleta "gira".
+    chatInput.disabled = true;
+    sendButton.disabled = true;
+
+    // 5. Iniciamos la animación de selección.
+    const opcionesEl = ruletaContainer.querySelectorAll('.ruleta-opcion');
+    let shuffleCount = 0;
+    const maxShuffles = 20 + Math.floor(Math.random() * 10);
+    const shuffleInterval = 100;
+
+    const intervalId = setInterval(() => {
+        opcionesEl.forEach(el => el.classList.remove('active'));
+        const randomIndex = Math.floor(Math.random() * opcionesEl.length);
+        opcionesEl[randomIndex].classList.add('active');
+        shuffleCount++;
+        
+        // 6. Comprobamos si la animación ha terminado.
+        if (shuffleCount >= maxShuffles) {
+            clearInterval(intervalId);
+            const eleccionFinal = opcionesEl[randomIndex].textContent;
+            
+            // 7. Devolvemos el resultado al cerebro.
+            setTimeout(() => {
+                ruletaContainer.remove();
+                chatInput.disabled = false;
+                sendButton.disabled = false;
+                chatInput.focus();
+                
+                // Llamamos a la función principal con la elección final.
+                procesarComandoUsuario(eleccionFinal); 
+            }, 1200);
+        }
+    }, shuffleInterval);
+}
+
+
+// (Aquí arriba estaría tu función mostrarRuleta que ya pegaste)
+
+
 // --- LÓGICA DE COMUNICACIÓN CON EL CEREBRO (A.L.E.) ---
-async function llamarALE(comando, estadoActual) {
+// REEMPLAZA TU FUNCIÓN ACTUAL CON ESTA:
+async function llamarALE(comando) {
     showThinkingIndicator();
+
+    // Asegúrate de que esta URL es la correcta de tu servidor en Render
+    const API_URL = 'https://el-guardian.onrender.com/execute';
+
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify({
                 skillset_target: "guardian",
                 comando: comando,
-                estado_conversacion: estadoActual
+                // Enviamos el estado de conversación actual, que es una variable global
+                estado_conversacion: estadoConversacion 
             })
         });
+
         if (!response.ok) {
-            throw new Error(`Error del Servidor: ${response.status}`);
+            throw new Error(`Error del servidor: ${response.status}`);
         }
-        const data = await response.json();
-        removeThinkingIndicator();
-        // ¡LA FUNCIÓN QUE FALTABA!
-        procesarRespuestaALE(data);
+
+        const respuesta = await response.json();
+
+        // Actualizamos el estado de la conversación para la próxima llamada
+        if (respuesta.nuevo_estado) {
+            estadoConversacion = respuesta.nuevo_estado;
+        }
+
+        // Decidimos qué hacer con la respuesta del cerebro
+        if (respuesta.accion_ui && respuesta.accion_ui === 'MOSTRAR_RULETA') {
+            removeThinkingIndicator();
+            // El cerebro nos pide mostrar la ruleta, así que llamamos a la función que está justo arriba
+            mostrarRuleta(respuesta.opciones_ruleta);
+        } else if (respuesta.mensaje_para_ui) {
+            // Es un mensaje de texto normal
+            addGuardianMessage(respuesta.mensaje_para_ui);
+        } else {
+            // Si la respuesta no es clara, lo indicamos y lo logueamos
+            removeThinkingIndicator();
+            console.log("Respuesta del servidor no reconocida:", respuesta);
+        }
+
     } catch (error) {
-        console.error("Error crítico al llamar a A.L.E.:", error);
+        console.error("Error en llamarALE:", error);
         removeThinkingIndicator();
-        addGuardianMessage(`Error de conexión. El núcleo en Render podría estar despertando. Por favor, espera un minuto y refresca la página. (Detalle: ${error.message})`);
+        addGuardianMessage("Error de conexión con el núcleo A.L.E. en Render.", false);
     }
 }
+
+
+// (Aquí abajo estaría tu función removeThinkingIndicator y el resto del código)
 
 // --- PROCESAMIENTO DE RESPUESTAS Y RENDERIZADO ---
 
@@ -114,12 +210,12 @@ function procesarRespuestaALE(data) {
         addGuardianMessage(`Error del núcleo: ${data.error}`);
         return;
     }
-
+    
     // Actualizamos el estado de la conversación con lo que nos mande el cerebro
     if (data.nuevo_estado) {
         estadoConversacion = data.nuevo_estado;
     }
-
+    
     // Si el cerebro nos manda un mensaje para la UI, lo mostramos
     if (data.mensaje_para_ui) {
         addGuardianMessage(data.mensaje_para_ui);
@@ -149,6 +245,7 @@ function addGuardianMessage(texto) {
     
     // Efecto Typewriter
     let i = 0;
+    
     function typeWriter() {
         if (i < texto.length) {
             messageBubble.innerHTML += texto.charAt(i);
