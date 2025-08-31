@@ -108,14 +108,38 @@ function addUserMessage(texto) {
     history.scrollTop = history.scrollHeight;
 }
 
+// En tu main.js, reemplaza la función addGuardianMessage por esta:
+
 function addGuardianMessage(texto) {
     removeThinkingIndicator();
+
+    // 1. Creamos la burbuja de mensaje, pero la dejamos vacía.
     const messageBubble = document.createElement('div');
     messageBubble.className = 'message-bubble guardian-message';
-    messageBubble.textContent = texto;
     history.appendChild(messageBubble);
-    history.scrollTop = history.scrollHeight;
+
+    // 2. Iniciamos la animación de máquina de escribir.
+    let i = 0;
+    const speed = 25; // Velocidad en milisegundos por caracter. Puedes ajustarla.
+
+    function typeWriter() {
+        if (i < texto.length) {
+            // Añadimos la siguiente letra al contenido de la burbuja.
+            messageBubble.textContent += texto.charAt(i);
+            i++;
+            
+            // Hacemos scroll para que siempre se vea la última línea.
+            history.scrollTop = history.scrollHeight;
+            
+            // Esperamos un poquito antes de escribir la siguiente letra.
+            setTimeout(typeWriter, speed);
+        }
+    }
+
+    // ¡Iniciamos el efecto!
+    typeWriter();
 }
+
 
 function showThinkingIndicator() {
     if (document.getElementById('thinking-bubble')) return;
