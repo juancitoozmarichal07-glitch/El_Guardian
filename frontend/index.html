@@ -5,15 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guardian</title>
     
-    <!-- Rutas corregidas para ser compatibles con servidores profesionales (sin ./) -->
-    <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="manifest.json">
+    <!-- CORRECCIÓN: Añadimos "./" para asegurar que las rutas funcionen en cualquier servidor -->
+    <link rel="stylesheet" href="./style.css">
+    <link rel="manifest" href="./manifest.json">
     
     <meta name="theme-color" content="#1e1e1e">
-
 </head>
 <body>
-
     <!-- Pantalla de Arranque -->
     <div id="boot-container">
         <h1 id="main-title">Guardian</h1>
@@ -22,11 +20,8 @@
 
     <!-- Contenedor Principal de la App (inicialmente oculto) -->
     <div id="app-container" class="hidden">
-        
-        <!-- El contenedor donde se mostrará la pantalla activa -->
+        <!-- ... (el resto de tu HTML de pantallas y nav-bar se queda igual) ... -->
         <main id="screen-container">
-            
-            <!-- PANTALLA 1: CHAT -->
             <div id="chat-screen" class="screen active">
                 <div id="history"></div>
                 <div id="input-area">
@@ -35,21 +30,9 @@
                     <button id="send-button" class="input-button">➤</button>
                 </div>
             </div>
-
-            <!-- PANTALLA 2: LOGROS Y RACHAS -->
-            <div id="logros-screen" class="screen">
-                <h1>Logros y Rachas</h1>
-                <div id="racha-container"></div>
-            </div>
-
-            <!-- PANTALLA 3: CALENDARIO DE CONTRATOS -->
-            <div id="calendario-screen" class="screen">
-                <h1>Calendario de Contratos</h1>
-                <div id="lista-contratos-container"></div>
-            </div>
+            <div id="logros-screen" class="screen"><h1>Logros y Rachas</h1><div id="racha-container"></div></div>
+            <div id="calendario-screen" class="screen"><h1>Calendario de Contratos</h1><div id="lista-contratos-container"></div></div>
         </main>
-
-        <!-- La Barra de Navegación -->
         <nav id="nav-bar">
             <button class="nav-button" data-target="logros-screen">🏆</button>
             <button class="nav-button active" data-target="chat-screen">💬</button>
@@ -57,7 +40,7 @@
         </nav>
     </div>
 
-    <!-- Ruta del script corregida (sin ./) -->
-    <script src="main.js"></script>
+    <!-- CORRECCIÓN: Añadimos "./" también a la ruta del script -->
+    <script src="./main.js"></script>
 </body>
 </html>
