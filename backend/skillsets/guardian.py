@@ -51,27 +51,47 @@ class Guardian:
             if self.historial_chat and self.historial_chat[-1].get("role") == "user": self.historial_chat.pop()
             return "Mi núcleo cognitivo tuvo una sobrecarga. Por favor, inténtalo de nuevo."
 
-    # --- ¡LÓGICA DE DISEÑO CORREGIDA Y CON MEMORIA! ---
-    def _gestionar_diseno(self, estado_actual, comando):
-        paso = estado_actual.get("paso_diseno")
+# guardian.py - VERSIÓN REPARADA
 
-        # Si estamos esperando la misión, cualquier cosa que se diga son las opciones.
+# ... (el código hasta _gestionar_diseno se queda igual) ...
+
+    def _gestionar_diseno(self, estado_actual, comando):
+        paso = estado_actual.get("paso_diseno", "ESPERANDO_MISION")
+
+        # PASO 1: El usuario manda las opciones de la misión
         if paso == "ESPERANDO_MISION":
             opciones = [opt.strip() for opt in comando.split(',') if opt.strip()]
             if not opciones:
                 return {"nuevo_estado": estado_actual, "mensaje_para_ui": "No he entendido las opciones. Por favor, define la misión."}
             
-            # ¡AQUÍ ESTÁ LA MAGIA! Le mandamos la orden de mostrar la ruleta al frontend.
+            # Cambiamos el estado para que la próxima respuesta sea el resultado de la ruleta
+            estado_actual["paso_diseno"] = "ESPERANDO_RESULTADO_MISION"
+            
             return {
                 "nuevo_estado": estado_actual, 
                 "accion_ui": "MOSTRAR_RULETA",
                 "opciones_ruleta": opciones
             }
         
-        # Aquí añadiremos los siguientes pasos (ESPERANDO_ESPECIFICACION, etc.)
-        
-        # Si no se cumple ninguna condición, es un estado desconocido.
+        # PASO 2 (NUEVO): El frontend nos devuelve el resultado de la ruleta
+        elif paso == "ESPERANDO_RESULTADO_MISION":
+            mision_elegida = comando
+            estado_actual["mision_base"] = mision_elegida
+            estado_actual["paso_diseno"] = "ESPERANDO_DECISION_ESPECIFICAR" # Nuevo paso
+            
+            # Devolvemos el resultado y preguntamos si quiere especificar
+            return {
+                "nuevo_estado": estado_actual,
+                "mensaje_para_ui": f"Misión aceptada: **{mision_elegida}**.\n\n¿Quieres añadir otra capa de ruleta para especificar más? (sí/no)"
+            }
+            
+        # Aquí iría la lógica para cuando el usuario responde "sí" o "no", etc.
+        # Por ahora, esto cierra el círculo de la primera ruleta.
+
         return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Error en la lógica de diseño. Estado desconocido."}
+
+# ... (el resto de tu guardian.py se queda igual) ...
+
 
     async def ejecutar(self, datos):
         estado = datos.get("estado_conversacion", {"modo": "libre"})
