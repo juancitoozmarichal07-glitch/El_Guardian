@@ -157,6 +157,8 @@ function removeThinkingIndicator() {
 }
 
 // --- FUNCIÓN PARA LA RULETA VISUAL ---
+// En tu main.js, reemplaza la función mostrarRuleta por esta:
+
 function mostrarRuleta(opciones) {
     const ruletaContainer = document.createElement('div');
     ruletaContainer.className = 'ruleta-container';
@@ -186,19 +188,31 @@ function mostrarRuleta(opciones) {
         shuffleCount++;
         
         if (shuffleCount >= maxShuffles) {
-            clearInterval(intervalId);
+            clearInterval(intervalId); // Detenemos la animación, pero NO borramos la ruleta.
+            
             const eleccionFinal = opcionesEl[randomIndex].textContent;
             
+            // --- ¡AQUÍ ESTÁ LA NUEVA LÓGICA! ---
+
+            // 1. Inmediatamente enviamos la elección al cerebro.
+            // El cerebro responderá con el mensaje de confirmación ("Misión elegida: ...")
+            // y ese mensaje aparecerá en pantalla MIENTRAS la ruleta todavía es visible.
+            llamarALE(eleccionFinal);
+
+            // 2. Esperamos un par de segundos para que el usuario vea todo junto.
             setTimeout(() => {
+                // 3. Ahora sí, limpiamos la ruleta de la pantalla.
                 ruletaContainer.remove();
+                
+                // 4. Y reactivamos la caja de texto para que el usuario pueda continuar.
                 chatInput.disabled = false;
                 sendButton.disabled = false;
                 chatInput.focus();
-                procesarComandoUsuario(eleccionFinal); 
-            }, 1200);
+            }, 2500); // Le damos 2.5 segundos. Puedes ajustar este tiempo.
         }
     }, shuffleInterval);
 }
+
 
 // --- LÓGICA DE COMUNICACIÓN CON EL CEREBRO (A.L.E.) ---
 async function llamarALE(comando) {
