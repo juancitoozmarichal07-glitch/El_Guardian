@@ -1,14 +1,7 @@
-# Fichero de dependencias robusto para El Guardián
-
-# 1. El núcleo del servidor web
+# Fichero de dependencias para El Guardián
 Flask
 Flask-Cors
-
-# 2. La librería de IA con su versión específica
-g4f==0.6.16
-
-# 3. Dependencias comunes que g4f puede necesitar
-# A veces, no se instalan automáticamente y causan errores.
+g4f
 httpx
 aiohttp
 cloudscraper
