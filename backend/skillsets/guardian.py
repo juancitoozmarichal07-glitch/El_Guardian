@@ -162,54 +162,62 @@ class Guardian:
             return "Mi núcleo cognitivo tuvo una sobrecarga."
 
     # --- Punto de Entrada Principal (¡MODIFICADO PARA CARGAR/GUARDAR ESTADO DIARIO!) ---
-    async def ejecutar(self, datos):
-        # 1. Cargar el estado del día actual al inicio de cada petición.
-        estado_hoy = self._cargar_estado_hoy()
+    # En tu guardian.py, reemplaza la función ejecutar por esta:
+
+async def ejecutar(self, datos):
+    estado_hoy = self._cargar_estado_hoy()
+    
+    estado_conversacion_cliente = datos.get("estado_conversacion", {"modo": "libre"})
+    estado_hoy["modo"] = estado_conversacion_cliente.get("modo")
+    estado_hoy["paso_diseno"] = estado_conversacion_cliente.get("paso_diseno")
+    estado_hoy["datos_plan"] = estado_conversacion_cliente.get("datos_plan", {})
+
+    comando = datos.get("comando", "")
+    respuesta_final = {}
+
+    # --- ¡LÓGICA DE SALUDO CORREGIDA! ---
+    if comando == "_SALUDO_INICIAL_":
+        estado_hoy["modo"] = "libre"
+        # 1. Preparamos la respuesta solo con el historial.
+        respuesta_final = {
+            "nuevo_estado": {"modo": "libre"}, 
+            "historial_para_ui": estado_hoy.get("historial_chat", [])
+        }
+        # 2. Si el historial está vacío (es la primera vez en el día), añadimos un saludo.
+        if not estado_hoy.get("historial_chat"):
+            saludo = "Guardián online. ¿Forjamos un Contrato o necesitas conversar?"
+            respuesta_final["mensaje_para_ui"] = saludo
+            estado_hoy["historial_chat"] = [{"role": "assistant", "content": saludo}]
+
+    else: # Si no es el saludo inicial, es un comando normal.
+        estado_hoy.setdefault("historial_chat", []).append({"role": "user", "content": comando})
+
+        palabras_clave_diseno = ["diseñar", "contrato", "forjar", "crear", "ruleta", "modo diseño"]
         
-        # El estado de la conversación viene del cliente, pero lo fusionamos con los datos del día.
-        estado_conversacion_cliente = datos.get("estado_conversacion", {"modo": "libre"})
-        estado_hoy["modo"] = estado_conversacion_cliente.get("modo")
-        estado_hoy["paso_diseno"] = estado_conversacion_cliente.get("paso_diseno")
-        estado_hoy["datos_plan"] = estado_conversacion_cliente.get("datos_plan", {})
+        if any(palabra in comando.lower() for palabra in palabras_clave_diseno) and estado_hoy.get("modo") != "diseño":
+            estado_hoy["modo"] = "diseño"
+            estado_hoy["paso_diseno"] = "ESPERANDO_MISION"
+            estado_hoy["datos_plan"] = {}
+            mensaje_bienvenida = "Modo Diseño activado. La claridad precede a la acción. Dime las opciones para la misión."
+            respuesta_final = {"nuevo_estado": {"modo": "diseño", "paso_diseno": "ESPERANDO_MISION", "datos_plan": {}}, "mensaje_para_ui": mensaje_bienvenida}
 
-        comando = datos.get("comando", "")
-        respuesta_final = {}
+        elif estado_hoy.get("modo") == "diseño":
+            respuesta_diseno = self._gestionar_diseno(estado_hoy, comando)
+            # Actualizamos el estado del día con la respuesta del diseño
+            estado_hoy["modo"] = respuesta_diseno["nuevo_estado"].get("modo")
+            estado_hoy["paso_diseno"] = respuesta_diseno["nuevo_estado"].get("paso_diseno")
+            estado_hoy["datos_plan"] = respuesta_diseno["nuevo_estado"].get("datos_plan")
+            respuesta_final = respuesta_diseno
 
-        if comando == "_SALUDO_INICIAL_":
-            # Al saludar, le enviamos el historial del día al cliente.
-            estado_hoy["modo"] = "libre"
-            respuesta_final = {"nuevo_estado": {"modo": "libre"}, "historial_para_ui": estado_hoy["historial_chat"], "mensaje_para_ui": "Guardián online. ¿Forjamos un Contrato o necesitas conversar?"}
-        
-        else:
-            # Añadimos el comando del usuario al historial del día
-            estado_hoy["historial_chat"].append({"role": "user", "content": comando})
+        else: # Modo conversacional
+            respuesta_conversacional = await self._gestionar_charla_ia(comando)
+            respuesta_final = {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": respuesta_conversacional}
 
-            palabras_clave_diseno = ["diseñar", "contrato", "forjar", "crear", "ruleta", "modo diseño"]
-            
-            if any(palabra in comando.lower() for palabra in palabras_clave_diseno) and estado_hoy.get("modo") != "diseño":
-                estado_hoy["modo"] = "diseño"
-                estado_hoy["paso_diseno"] = "ESPERANDO_MISION"
-                estado_hoy["datos_plan"] = {}
-                mensaje_bienvenida = "Modo Diseño activado. La claridad precede a la acción. Dime las opciones para la misión."
-                respuesta_final = {"nuevo_estado": {"modo": "diseño", "paso_diseno": "ESPERANDO_MISION", "datos_plan": {}}, "mensaje_para_ui": mensaje_bienvenida}
+        # Añadimos la respuesta del Guardián al historial del día
+        if respuesta_final.get("mensaje_para_ui"):
+            estado_hoy.setdefault("historial_chat", []).append({"role": "assistant", "content": respuesta_final.get("mensaje_para_ui")})
 
-            elif estado_hoy.get("modo") == "diseño":
-                respuesta_diseno = self._gestionar_diseno(estado_hoy, comando)
-                estado_hoy["modo"] = respuesta_diseno["nuevo_estado"].get("modo")
-                estado_hoy["paso_diseno"] = respuesta_diseno["nuevo_estado"].get("paso_diseno")
-                estado_hoy["datos_plan"] = respuesta_diseno["nuevo_estado"].get("datos_plan")
-                respuesta_final = respuesta_diseno
-
-            else: # Modo conversacional
-                respuesta_conversacional = await self._gestionar_charla_ia(comando)
-                respuesta_final = {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": respuesta_conversacional}
-
-            # Añadimos la respuesta del Guardián al historial del día
-            if respuesta_final.get("mensaje_para_ui"):
-                estado_hoy["historial_chat"].append({"role": "assistant", "content": respuesta_final.get("mensaje_para_ui")})
-
-        # 2. Guardar el estado actualizado del día antes de devolver la respuesta.
-        self._guardar_estado_hoy(estado_hoy)
-        
-        return respuesta_final
-
+    # Guardamos el estado actualizado del día antes de devolver la respuesta.
+    self._guardar_estado_hoy(estado_hoy)
+    
+    return respuesta_final
