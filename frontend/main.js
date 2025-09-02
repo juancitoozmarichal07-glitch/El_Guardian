@@ -215,7 +215,7 @@ async function llamarALE(comando) {
     showThinkingIndicator();
 
     try {
-        const respuestaServidor = await fetch(API_URL, {
+        const respuestaServidor = await fetch(URL_ALE_SERVER, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -226,38 +226,26 @@ async function llamarALE(comando) {
         });
 
         if (!respuestaServidor.ok) {
-            throw new Error('Error de red o del servidor A.L.E.');
+            throw new Error(`Error ${respuestaServidor.status} del servidor A.L.E.`);
         }
 
         const respuesta = await respuestaServidor.json();
         removeThinkingIndicator();
 
-        // --- ¡AQUÍ ESTÁ LA LÓGICA CLAVE! ---
+        // --- LÓGICA SIMPLIFICADA Y ALINEADA CON EL BACKEND ESTABLE ---
 
-        // 1. Si el servidor nos manda un historial, es la carga inicial del día.
-        if (respuesta.historial_para_ui && Array.isArray(respuesta.historial_para_ui)) {
-            history.innerHTML = ''; // Limpiamos el chat.
-            respuesta.historial_para_ui.forEach(mensaje => {
-                if (mensaje.role === 'user') {
-                    addUserMessage(mensaje.content);
-                } else if (mensaje.role === 'assistant') {
-                    addGuardianMessage(mensaje.content, false); // Sin efecto máquina de escribir
-                }
-            });
-        }
-
-        // 2. Si hay una acción UI (como la ruleta), la ejecutamos.
+        // 1. Si hay una acción UI (como la ruleta), la ejecutamos.
         if (respuesta.accion_ui) {
             if (respuesta.accion_ui === 'MOSTRAR_RULETA') {
                 mostrarRuleta(respuesta.opciones_ruleta);
             }
         } 
-        // 3. Si hay un mensaje nuevo, lo añadimos.
+        // 2. Si no hay acción, pero sí un mensaje, lo mostramos.
         else if (respuesta.mensaje_para_ui) {
-            addGuardianMessage(respuesta.mensaje_para_ui, true); // Con efecto máquina de escribir
+            addGuardianMessage(respuesta.mensaje_para_ui, true);
         }
 
-        // 4. Actualizamos el estado de la conversación.
+        // 3. SIEMPRE actualizamos el estado de la conversación.
         if (respuesta.nuevo_estado) {
             estadoConversacion = respuesta.nuevo_estado;
         }
@@ -265,7 +253,8 @@ async function llamarALE(comando) {
     } catch (error) {
         console.error("Error en llamarALE:", error);
         removeThinkingIndicator();
-        addGuardianMessage("Error de conexión con el núcleo A.L.E. en Render.", false);
+        addGuardianMessage("Error de conexión con el núcleo A.L.E. Revisa la consola.", false);
     }
 }
+
 
