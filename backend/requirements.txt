@@ -1,4 +1,4 @@
-# Fichero de dependencias FINAL para El Guardián
+# Fichero de dependencias FINAL para El Guardian
 Flask
 Flask-Cors
 g4f
@@ -7,3 +7,4 @@ aiohttp
 cloudscraper
 typing-extensions
 gunicorn
+gevent 
