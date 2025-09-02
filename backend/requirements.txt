@@ -6,4 +6,3 @@ httpx
 aiohttp
 cloudscraper
 typing-extensions
-gevent
