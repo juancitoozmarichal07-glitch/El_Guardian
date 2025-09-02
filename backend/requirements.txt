@@ -7,4 +7,4 @@ aiohttp
 cloudscraper
 typing-extensions
 gunicorn
-gevent 
+meinheld
