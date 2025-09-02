@@ -1,4 +1,4 @@
-# ale_core.py (VERSIÓN FINAL Y DEFINITIVA)
+# ale_core.py (VERSIÓN ESTABLE Y DEFINITIVA)
 
 class ALE_Core:
     def __init__(self):
@@ -25,4 +25,3 @@ class ALE_Core:
         # 3. Pasa la petición al skillset correcto.
         print(f"--> Petición recibida para el skillset: '{skillset_nombre}'")
         return await skillset_a_usar.ejecutar(datos_peticion)
-
