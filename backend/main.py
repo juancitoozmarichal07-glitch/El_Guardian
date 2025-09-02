@@ -14,7 +14,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # Importamos las clases de los archivos .py correspondientes.
 from ale_core import ALE_Core
 from skillsets.guardian import Guardian
-from skillsets.oracle import Oracle
+# from skillsets.oracle import Oracle
 
 # --- PASO 2: CONFIGURAR LA APLICACIÓN FLASK ---
 # Creamos la app. No es necesario tocar más esta parte.
