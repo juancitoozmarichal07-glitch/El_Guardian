@@ -1,27 +1,50 @@
-# ale_core.py (VERSIÓN ESTABLE Y DEFINITIVA)
+# =================================================================
+# ALE_CORE.PY (v1.0 - ESTABLE)
+# =================================================================
+# Este es el motor central. Actúa como un recepcionista que dirige
+# las peticiones al especialista (skillset) adecuado.
 
 class ALE_Core:
     def __init__(self):
-        self.skillsets = {}
-        print("⚡ A.L.E. Core v3.0 (Arquitectura de Directorio) inicializado.")
+        """
+        Inicializa el motor A.L.E. y prepara el diccionario
+        para almacenar los skillsets que se carguen.
+        """
+        self._skillsets = {}
+        print("✅ Motor A.L.E. Core v1.0 (Estable) inicializado.")
 
-    def cargar_skillset(self, nombre, skillset):
-        self.skillsets[nombre] = skillset
-        print(f"✅ Skillset '{nombre}' cargado y listo para recibir peticiones.")
+    def cargar_skillset(self, nombre, instancia_skillset):
+        """
+        Carga una instancia de un skillset en el motor.
+        El 'nombre' es la clave que usará la PWA para llamar a este skillset.
+        """
+        self._skillsets[nombre] = instancia_skillset
+        print(f"    -> Skillset '{nombre}' cargado en el motor.")
 
     async def procesar_peticion(self, datos_peticion):
-        # 1. Lee el identificador para saber a qué skillset llamar.
-        skillset_nombre = datos_peticion.get("skillset_target")
+        """
+        El punto de entrada principal para todas las llamadas desde el main.py.
+        Lee la petición, encuentra el skillset solicitado y le pasa el trabajo.
+        """
+        # Extrae el nombre del skillset que la PWA quiere usar.
+        nombre_skillset = datos_peticion.get("skillset_target")
 
-        if not skillset_nombre:
-            return {"error": "Petición inválida. No se especificó un 'skillset_target'."}
+        if not nombre_skillset:
+            return {"error": "Petición inválida: No se especificó un 'skillset_target'."}
 
-        # 2. Busca el skillset solicitado en la biblioteca.
-        skillset_a_usar = self.skillsets.get(skillset_nombre)
-            
-        if not skillset_a_usar:
-            return {"error": f"Skillset '{skillset_nombre}' no encontrado o no cargado."}
-            
-        # 3. Pasa la petición al skillset correcto.
-        print(f"--> Petición recibida para el skillset: '{skillset_nombre}'")
-        return await skillset_a_usar.ejecutar(datos_peticion)
+        # Busca el skillset en el diccionario.
+        skillset_seleccionado = self._skillsets.get(nombre_skillset)
+
+        if not skillset_seleccionado:
+            return {"error": f"Skillset '{nombre_skillset}' no encontrado o no cargado."}
+
+        # Si lo encuentra, le pasa la petición completa para que la ejecute.
+        # El skillset es quien decide qué hacer con los datos.
+        try:
+            # La función 'ejecutar' debe ser asíncrona en cada skillset.
+            resultado = await skillset_seleccionado.ejecutar(datos_peticion)
+            return resultado
+        except Exception as e:
+            print(f"🚨 ERROR al ejecutar el skillset '{nombre_skillset}': {e}")
+            return {"error": f"Hubo un error interno en el skillset '{nombre_skillset}'."}
+
