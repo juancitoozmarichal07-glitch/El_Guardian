@@ -1,223 +1,165 @@
 # =================================================================
-# guardian.py (v14.0 - EL PIZARRÓN DIARIO)
+# guardian.py (v12.0 - VERSIÓN ESTABLE Y FUNCIONAL)
 # =================================================================
+# Esta es la versión que funcionaba antes de la memoria diaria.
+# La usamos como base segura para reconstruir.
 
 import json
-import os
 from datetime import datetime
 import g4f
 
 class Guardian:
     def __init__(self):
-        # La memoria ya no se carga al iniciar, se carga por petición.
-        self.ruta_memoria = 'memoria'
-        if not os.path.exists(self.ruta_memoria):
-            os.makedirs(self.ruta_memoria)
-        print(f"    - Especialista 'Guardian' v14.0 (Pizarrón Diario) listo.")
+        print(f"    - Especialista 'Guardian' v12.0 (Estable) listo.")
 
-    # --- NUEVAS FUNCIONES DE GESTIÓN DE MEMORIA DIARIA ---
-    def _get_ruta_archivo_hoy(self):
-        """Devuelve la ruta completa al archivo JSON del día actual."""
-        hoy_str = datetime.now().strftime('%Y-%m-%d')
-        return os.path.join(self.ruta_memoria, f"{hoy_str}.json")
-
-    def _cargar_estado_hoy(self):
-        """Carga el estado del día actual. Si no existe, crea uno nuevo."""
-        ruta_archivo = self._get_ruta_archivo_hoy()
-        try:
-            with open(ruta_archivo, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            # Si el archivo no existe o está corrupto, empezamos un día nuevo.
-            return {"historial_chat": [], "contratos_forjados": []}
-
-    def _guardar_estado_hoy(self, estado):
-        """Guarda el estado proporcionado en el archivo del día actual."""
-        ruta_archivo = self._get_ruta_archivo_hoy()
-        with open(ruta_archivo, 'w', encoding='utf-8') as f:
-            json.dump(estado, f, indent=4)
-
-    # --- Lógica de Diseño de Contratos (sin cambios, pero ahora usa el estado diario) ---
+    # --- LÓGICA DE DISEÑO COMPLETA Y FUNCIONAL ---
     def _gestionar_diseno(self, estado_actual, comando):
-        # (Esta función se queda exactamente igual que en la v13.0)
-        # ... (pegar aquí la función _gestionar_diseno completa de la v13.0)
         paso = estado_actual.get("paso_diseno")
         datos_plan = estado_actual.get("datos_plan", {})
 
-        # PASO 1: MISIÓN INICIAL
+        # PASO 1: MISIÓN
         if paso == "ESPERANDO_MISION":
             opciones = [opt.strip() for opt in comando.split(',') if opt.strip()]
-            if not opciones: return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Define la misión."}
+            if not opciones:
+                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Define la misión."}
             if len(opciones) == 1:
-                datos_plan["mision"] = [opciones[0]]
-                nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_DECISION_ESPECIFICACION", "datos_plan": datos_plan}
-                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Misión aceptada: **{opciones[0]}**.\n\n¿Necesitas especificar más? (sí/no)"}
+                datos_plan["mision"] = opciones[0]
+                nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ESPECIFICACION", "datos_plan": datos_plan}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Misión: **{opciones[0]}**. ¿Necesitas especificar más? (sí/no)"}
             else:
                 estado_actual["paso_diseno"] = "ESPERANDO_RESULTADO_MISION"
                 return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
-        elif paso == "ESPERANDO_RESULTADO_MISION":
-            datos_plan["mision"] = [comando]
-            nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_DECISION_ESPECIFICACION", "datos_plan": datos_plan}
-            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Misión elegida: **{comando}**.\n\n¿Necesitas especificar más? (sí/no)"}
 
-        # PASO 2: ESPECIFICACIÓN
-        elif paso == "ESPERANDO_DECISION_ESPECIFICACION":
-            if "si" in comando.lower():
-                nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ESPECIFICACION", "datos_plan": datos_plan}
-                mision_actual_str = " -> ".join(datos_plan.get('mision', []))
-                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Misión actual: **{mision_actual_str}**.\n\nDime las opciones para la siguiente capa."}
-            elif "no" in comando.lower():
-                nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ARRANQUE", "datos_plan": datos_plan}
-                mision_final_str = " -> ".join(datos_plan.get('mision', []))
-                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Perfecto. Misión definida: **{mision_final_str}**.\n\nAhora, define el **momento de arranque**."}
-            else: return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Responde 'sí' o 'no'."}
+        elif paso == "ESPERANDO_RESULTADO_MISION":
+            datos_plan["mision"] = comando
+            nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ESPECIFICACION", "datos_plan": datos_plan}
+            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Misión elegida: **{comando}**. ¿Necesitas especificar más? (sí/no)"}
+
+        # PASO 2: ESPECIFICACIÓN (OPCIONAL, EN CASCADA)
         elif paso == "ESPERANDO_ESPECIFICACION":
+            if "si" in comando.lower():
+                nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_OPCIONES_ESPECIFICACION", "datos_plan": datos_plan}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Entendido. Dame las opciones para la siguiente capa de especificación."}
+            else: # Si dice "no" o cualquier otra cosa, saltamos al arranque.
+                nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ARRANQUE", "datos_plan": datos_plan}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Misión definida. Ahora, define el **momento de arranque**."}
+
+        elif paso == "ESPERANDO_OPCIONES_ESPECIFICACION":
             opciones = [opt.strip() for opt in comando.split(',') if opt.strip()]
-            if not opciones: return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Define la especificación."}
+            if not opciones:
+                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Define las opciones de especificación."}
+            
+            mision_actual = datos_plan.get("mision", "")
+            if "especificaciones" not in datos_plan:
+                datos_plan["especificaciones"] = []
+            
             if len(opciones) == 1:
-                datos_plan["mision"].append(opciones[0])
-                nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_DECISION_ESPECIFICACION", "datos_plan": datos_plan}
-                mision_actual_str = " -> ".join(datos_plan.get('mision', []))
-                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Misión actualizada: **{mision_actual_str}**.\n\n¿Necesitas especificar más? (sí/no)"}
+                datos_plan["especificaciones"].append(opciones[0])
+                mision_completa = f"{mision_actual} -> {' -> '.join(datos_plan['especificaciones'])}"
+                nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ESPECIFICACION", "datos_plan": datos_plan}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Entendido: **{mision_completa}**. ¿Otra capa más? (sí/no)"}
             else:
                 estado_actual["paso_diseno"] = "ESPERANDO_RESULTADO_ESPECIFICACION"
                 return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
+
         elif paso == "ESPERANDO_RESULTADO_ESPECIFICACION":
-            datos_plan["mision"].append(comando)
-            nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_DECISION_ESPECIFICACION", "datos_plan": datos_plan}
-            mision_actual_str = " -> ".join(datos_plan.get('mision', []))
-            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Misión actualizada: **{mision_actual_str}**.\n\n¿Necesitas especificar más? (sí/no)"}
+            if "especificaciones" not in datos_plan:
+                datos_plan["especificaciones"] = []
+            datos_plan["especificaciones"].append(comando)
+            mision_actual = datos_plan.get("mision", "")
+            mision_completa = f"{mision_actual} -> {' -> '.join(datos_plan['especificaciones'])}"
+            nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ESPECIFICACION", "datos_plan": datos_plan}
+            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Entendido: **{mision_completa}**. ¿Otra capa más? (sí/no)"}
 
         # PASO 3: ARRANQUE
         elif paso == "ESPERANDO_ARRANQUE":
-            # ... (lógica de arranque igual que v13.0)
             opciones = [opt.strip() for opt in comando.split(',') if opt.strip()]
-            if not opciones: return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Define el momento de arranque."}
+            if not opciones:
+                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Define el momento de arranque."}
             if len(opciones) == 1:
                 datos_plan["arranque"] = opciones[0]
                 nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_DECISION_DURACION", "datos_plan": datos_plan}
-                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Arranque fijado para: **{opciones[0]}**.\n\n¿Necesitas definir una duración? (sí/no)"}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Arranque: **{opciones[0]}**. ¿Necesitas definir una duración? (sí/no)"}
             else:
                 estado_actual["paso_diseno"] = "ESPERANDO_RESULTADO_ARRANQUE"
                 return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
+
         elif paso == "ESPERANDO_RESULTADO_ARRANQUE":
             datos_plan["arranque"] = comando
             nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_DECISION_DURACION", "datos_plan": datos_plan}
-            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Arranque fijado para: **{comando}**.\n\n¿Necesitas definir una duración? (sí/no)"}
+            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Arranque: **{comando}**. ¿Necesitas definir una duración? (sí/no)"}
 
         # PASO 4: DURACIÓN
         elif paso == "ESPERANDO_DECISION_DURACION":
-            # ... (lógica de decisión de duración igual que v13.0)
             if "si" in comando.lower():
                 nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_DURACION", "datos_plan": datos_plan}
-                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Entendido. Dime las opciones para la duración."}
-            elif "no" in comando.lower():
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Entendido. Dime las opciones para la duración (ej: 25 min, 1 hora)."}
+            else:
                 datos_plan["duracion"] = "No definida"
-                mision_final_str = " -> ".join(datos_plan.get('mision', ['N/A']))
-                contrato_texto = (f"**CONTRATO FORJADO**\n--------------------\n**Misión:** {mision_final_str}\n**Arranque:** {datos_plan.get('arranque', 'N/A')}\n**Duración:** {datos_plan.get('duracion', 'N/A')}\n--------------------\nContrato sellado. ¿Siguiente misión?")
-                
-                # Guardamos el contrato antes de salir del modo diseño
-                estado_actual["contratos_forjados"].append({"mision": mision_final_str, "arranque": datos_plan.get('arranque', 'N/A'), "duracion": datos_plan.get('duracion', 'N/A'), "estado": "agendado"})
-                
-                return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": contrato_texto}
-            else: return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Responde 'sí' o 'no'."}
+                return self._forjar_contrato(datos_plan)
+
         elif paso == "ESPERANDO_DURACION":
-            # ... (lógica de duración igual que v13.0, con "min")
             opciones = [opt.strip() for opt in comando.split(',') if opt.strip()]
-            if not opciones: return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Define la duración."}
+            if not opciones:
+                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Define la duración."}
             if len(opciones) == 1:
                 datos_plan["duracion"] = opciones[0]
-                mision_final_str = " -> ".join(datos_plan.get('mision', ['N/A']))
-                contrato_texto = (f"**CONTRATO FORJADO**\n--------------------\n**Misión:** {mision_final_str}\n**Arranque:** {datos_plan.get('arranque', 'N/A')}\n**Duración:** {datos_plan.get('duracion', 'N/A')} min\n--------------------\nContrato sellado. ¿Siguiente misión?")
-                
-                # Guardamos el contrato
-                estado_actual["contratos_forjados"].append({"mision": mision_final_str, "arranque": datos_plan.get('arranque', 'N/A'), "duracion": f"{datos_plan.get('duracion', 'N/A')} min", "estado": "agendado"})
-                
-                return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": contrato_texto}
+                return self._forjar_contrato(datos_plan)
             else:
                 estado_actual["paso_diseno"] = "ESPERANDO_RESULTADO_DURACION"
                 return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
+
         elif paso == "ESPERANDO_RESULTADO_DURACION":
             datos_plan["duracion"] = comando
-            mision_final_str = " -> ".join(datos_plan.get('mision', ['N/A']))
-            contrato_texto = (f"**CONTRATO FORJADO**\n--------------------\n**Misión:** {mision_final_str}\n**Arranque:** {datos_plan.get('arranque', 'N/A')}\n**Duración:** {datos_plan.get('duracion', 'N/A')} min\n--------------------\nContrato sellado. ¿Siguiente misión?")
-            
-            # Guardamos el contrato
-            estado_actual["contratos_forjados"].append({"mision": mision_final_str, "arranque": datos_plan.get('arranque', 'N/A'), "duracion": f"{datos_plan.get('duracion', 'N/A')} min", "estado": "agendado"})
-            
-            return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": contrato_texto}
+            return self._forjar_contrato(datos_plan)
 
-        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Hubo un error en el flujo de diseño. Reiniciando."}
+        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo. Reiniciando."}
 
-    # --- Lógica de Conversación con IA (sin cambios) ---
+    # --- FUNCIÓN AUXILIAR PARA SELLAR EL CONTRATO ---
+    def _forjar_contrato(self, datos_plan):
+        mision_base = datos_plan.get('mision', 'N/A')
+        especificaciones = datos_plan.get('especificaciones', [])
+        mision_completa = f"{mision_base} -> {' -> '.join(especificaciones)}" if especificaciones else mision_base
+        
+        contrato_texto = (
+            f"**CONTRATO FORJADO**\n--------------------\n"
+            f"**Misión:** {mision_completa}\n"
+            f"**Arranque:** {datos_plan.get('arranque', 'N/A')}\n"
+            f"**Duración:** {datos_plan.get('duracion', 'N/A')}\n--------------------\n"
+            f"Contrato sellado. ¿Siguiente misión?"
+        )
+        nuevo_estado = {"modo": "libre"}
+        return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": contrato_texto}
+
+    # --- Lógica de Conversación con IA ---
     async def _gestionar_charla_ia(self, comando):
-        # ... (pegar aquí la función _gestionar_charla_ia completa de la v13.0)
         try:
             prompt = f"Eres el Guardián, una IA compañera de Juan. Eres directo, sabio y motivador. El usuario dice: '{comando}'"
-            respuesta_ia = await g4f.ChatCompletion.create_async(model=g4f.models.default, messages=[{"role": "user", "content": prompt}])
-            if not respuesta_ia: raise ValueError("La respuesta de la IA llegó vacía.")
-            return respuesta_ia
+            respuesta_ia = await g4f.ChatCompletion.create_async(
+                model=g4f.models.default,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            return respuesta_ia or "No he podido procesar eso. Intenta de nuevo."
         except Exception as e:
-            print(f"Error crítico al llamar a g4f: {e}")
-            return "Mi núcleo cognitivo tuvo una sobrecarga."
+            print(f"Error en g4f: {e}")
+            return "Mi núcleo cognitivo tuvo una sobrecarga. Inténtalo de nuevo."
 
-    # --- Punto de Entrada Principal (¡MODIFICADO PARA CARGAR/GUARDAR ESTADO DIARIO!) ---
-    # En tu guardian.py, reemplaza la función ejecutar por esta:
+    # --- Punto de Entrada Principal ---
+    async def ejecutar(self, datos):
+        estado = datos.get("estado_conversacion", {"modo": "libre"})
+        comando = datos.get("comando", "")
 
-async def ejecutar(self, datos):
-    estado_hoy = self._cargar_estado_hoy()
-    
-    estado_conversacion_cliente = datos.get("estado_conversacion", {"modo": "libre"})
-    estado_hoy["modo"] = estado_conversacion_cliente.get("modo")
-    estado_hoy["paso_diseno"] = estado_conversacion_cliente.get("paso_diseno")
-    estado_hoy["datos_plan"] = estado_conversacion_cliente.get("datos_plan", {})
-
-    comando = datos.get("comando", "")
-    respuesta_final = {}
-
-    # --- ¡LÓGICA DE SALUDO CORREGIDA! ---
-    if comando == "_SALUDO_INICIAL_":
-        estado_hoy["modo"] = "libre"
-        # 1. Preparamos la respuesta solo con el historial.
-        respuesta_final = {
-            "nuevo_estado": {"modo": "libre"}, 
-            "historial_para_ui": estado_hoy.get("historial_chat", [])
-        }
-        # 2. Si el historial está vacío (es la primera vez en el día), añadimos un saludo.
-        if not estado_hoy.get("historial_chat"):
-            saludo = "Guardián online. ¿Forjamos un Contrato o necesitas conversar?"
-            respuesta_final["mensaje_para_ui"] = saludo
-            estado_hoy["historial_chat"] = [{"role": "assistant", "content": saludo}]
-
-    else: # Si no es el saludo inicial, es un comando normal.
-        estado_hoy.setdefault("historial_chat", []).append({"role": "user", "content": comando})
+        if comando == "_SALUDO_INICIAL_":
+            return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Guardián online. ¿Forjamos un Contrato o necesitas conversar?"}
 
         palabras_clave_diseno = ["diseñar", "contrato", "forjar", "crear", "ruleta", "modo diseño"]
         
-        if any(palabra in comando.lower() for palabra in palabras_clave_diseno) and estado_hoy.get("modo") != "diseño":
-            estado_hoy["modo"] = "diseño"
-            estado_hoy["paso_diseno"] = "ESPERANDO_MISION"
-            estado_hoy["datos_plan"] = {}
-            mensaje_bienvenida = "Modo Diseño activado. La claridad precede a la acción. Dime las opciones para la misión."
-            respuesta_final = {"nuevo_estado": {"modo": "diseño", "paso_diseno": "ESPERANDO_MISION", "datos_plan": {}}, "mensaje_para_ui": mensaje_bienvenida}
+        if any(palabra in comando.lower() for palabra in palabras_clave_diseno) and estado.get("modo") != "diseño":
+            nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_MISION", "datos_plan": {}}
+            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Diseño activado. Define la misión."}
 
-        elif estado_hoy.get("modo") == "diseño":
-            respuesta_diseno = self._gestionar_diseno(estado_hoy, comando)
-            # Actualizamos el estado del día con la respuesta del diseño
-            estado_hoy["modo"] = respuesta_diseno["nuevo_estado"].get("modo")
-            estado_hoy["paso_diseno"] = respuesta_diseno["nuevo_estado"].get("paso_diseno")
-            estado_hoy["datos_plan"] = respuesta_diseno["nuevo_estado"].get("datos_plan")
-            respuesta_final = respuesta_diseno
+        if estado.get("modo") == "diseño":
+            return self._gestionar_diseno(estado, comando)
 
-        else: # Modo conversacional
-            respuesta_conversacional = await self._gestionar_charla_ia(comando)
-            respuesta_final = {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": respuesta_conversacional}
-
-        # Añadimos la respuesta del Guardián al historial del día
-        if respuesta_final.get("mensaje_para_ui"):
-            estado_hoy.setdefault("historial_chat", []).append({"role": "assistant", "content": respuesta_final.get("mensaje_para_ui")})
-
-    # Guardamos el estado actualizado del día antes de devolver la respuesta.
-    self._guardar_estado_hoy(estado_hoy)
-    
-    return respuesta_final
+        respuesta_conversacional = await self._gestionar_charla_ia(comando)
+        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": respuesta_conversacional}
