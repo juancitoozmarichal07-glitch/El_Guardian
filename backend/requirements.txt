@@ -1,10 +1,9 @@
-# Fichero de dependencias FINAL para El Guardian
 Flask
 Flask-Cors
+gunicorn
 g4f
 httpx
 aiohttp
 cloudscraper
 typing-extensions
-gunicorn
-meinheld
+gevent
