@@ -2,6 +2,7 @@
 Flask
 Flask-Cors
 g4f
+typing-extensions
 httpx
 aiohttp
 cloudscraper
