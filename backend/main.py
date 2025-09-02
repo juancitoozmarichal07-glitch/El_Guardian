@@ -28,7 +28,7 @@ ale = ALE_Core()
 # Cargamos cada skillset con un nombre único.
 # Este nombre es el que usarás en el 'main.js' de cada PWA para identificarse.
 ale.cargar_skillset("guardian", Guardian())
-ale.cargar_skillset("oracle", Oracle())
+# ale.cargar_skillset("oracle", Oracle())
 
 print("✅ Motor A.L.E. inicializado. Skillsets 'guardian' y 'oracle' cargados.")
 
