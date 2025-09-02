@@ -110,34 +110,29 @@ function addUserMessage(texto) {
 
 // En tu main.js, reemplaza la función addGuardianMessage por esta:
 
-function addGuardianMessage(texto) {
-    removeThinkingIndicator();
-
-    // 1. Creamos la burbuja de mensaje, pero la dejamos vacía.
+// Reemplaza tu función addGuardianMessage por esta:
+function addGuardianMessage(texto, conTypewriter = true) {
     const messageBubble = document.createElement('div');
     messageBubble.className = 'message-bubble guardian-message';
     history.appendChild(messageBubble);
-
-    // 2. Iniciamos la animación de máquina de escribir.
-    let i = 0;
-    const speed = 25; // Velocidad en milisegundos por caracter. Puedes ajustarla.
-
-    function typeWriter() {
-        if (i < texto.length) {
-            // Añadimos la siguiente letra al contenido de la burbuja.
-            messageBubble.textContent += texto.charAt(i);
-            i++;
-            
-            // Hacemos scroll para que siempre se vea la última línea.
-            history.scrollTop = history.scrollHeight;
-            
-            // Esperamos un poquito antes de escribir la siguiente letra.
-            setTimeout(typeWriter, speed);
+    
+    if (conTypewriter && texto) { // Añadida comprobación de que 'texto' no sea nulo
+        let i = 0;
+        const speed = 20;
+        
+        function typeWriter() {
+            if (i < texto.length) {
+                messageBubble.textContent += texto.charAt(i);
+                i++;
+                history.scrollTop = history.scrollHeight;
+                setTimeout(typeWriter, speed);
+            }
         }
+        typeWriter();
+    } else {
+        messageBubble.textContent = texto;
     }
-
-    // ¡Iniciamos el efecto!
-    typeWriter();
+    history.scrollTop = history.scrollHeight;
 }
 
 
@@ -215,36 +210,56 @@ function mostrarRuleta(opciones) {
 
 
 // --- LÓGICA DE COMUNICACIÓN CON EL CEREBRO (A.L.E.) ---
+// En tu main.js, reemplaza la función llamarALE por esta:
 async function llamarALE(comando) {
     showThinkingIndicator();
 
     try {
-        const response = await fetch(URL_ALE_SERVER, {
+        const respuestaServidor = await fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                skillset_target: "guardian",
                 comando: comando,
-                estado_conversacion: estadoConversacion 
+                skillset_target: 'guardian',
+                estado_conversacion: estadoConversacion
             })
         });
 
-        if (!response.ok) throw new Error(`Error del servidor: ${response.status}`);
-
-        const respuesta = await response.json();
-
-        if (respuesta.nuevo_estado) {
-            estadoConversacion = respuesta.nuevo_estado;
+        if (!respuestaServidor.ok) {
+            throw new Error('Error de red o del servidor A.L.E.');
         }
 
-        if (respuesta.accion_ui && respuesta.accion_ui === 'MOSTRAR_RULETA') {
-            removeThinkingIndicator();
-            mostrarRuleta(respuesta.opciones_ruleta);
-        } else if (respuesta.mensaje_para_ui) {
-            addGuardianMessage(respuesta.mensaje_para_ui);
-        } else {
-            removeThinkingIndicator();
-            console.log("Respuesta del servidor no reconocida:", respuesta);
+        const respuesta = await respuestaServidor.json();
+        removeThinkingIndicator();
+
+        // --- ¡AQUÍ ESTÁ LA LÓGICA CLAVE! ---
+
+        // 1. Si el servidor nos manda un historial, es la carga inicial del día.
+        if (respuesta.historial_para_ui && Array.isArray(respuesta.historial_para_ui)) {
+            history.innerHTML = ''; // Limpiamos el chat.
+            respuesta.historial_para_ui.forEach(mensaje => {
+                if (mensaje.role === 'user') {
+                    addUserMessage(mensaje.content);
+                } else if (mensaje.role === 'assistant') {
+                    addGuardianMessage(mensaje.content, false); // Sin efecto máquina de escribir
+                }
+            });
+        }
+
+        // 2. Si hay una acción UI (como la ruleta), la ejecutamos.
+        if (respuesta.accion_ui) {
+            if (respuesta.accion_ui === 'MOSTRAR_RULETA') {
+                mostrarRuleta(respuesta.opciones_ruleta);
+            }
+        } 
+        // 3. Si hay un mensaje nuevo, lo añadimos.
+        else if (respuesta.mensaje_para_ui) {
+            addGuardianMessage(respuesta.mensaje_para_ui, true); // Con efecto máquina de escribir
+        }
+
+        // 4. Actualizamos el estado de la conversación.
+        if (respuesta.nuevo_estado) {
+            estadoConversacion = respuesta.nuevo_estado;
         }
 
     } catch (error) {
@@ -253,3 +268,4 @@ async function llamarALE(comando) {
         addGuardianMessage("Error de conexión con el núcleo A.L.E. en Render.", false);
     }
 }
+
