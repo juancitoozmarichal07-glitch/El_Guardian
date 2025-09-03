@@ -1,20 +1,19 @@
 // =================================================================
-// MAIN.JS - VERSIÓN FINAL Y FUNCIONAL
-// Conecta con Render, maneja la ruleta y la transición de arranque.
+// MAIN.JS - v2.0 CON PERSISTENCIA LOCAL
+// Guarda el historial del chat en el navegador para que no se
+// pierda al cerrar la aplicación.
 // =================================================================
 
 // --- CONFIGURACIÓN GLOBAL Y ESTADO DEL CLIENTE ---
 const NOMBRE_USUARIO = "Juan";
-// La URL de tu cerebro en Render. ¡Esta es la conexión clave!
 const URL_ALE_SERVER = 'https://el-guardian.onrender.com/execute';
-let estadoConversacion = { modo: 'libre' }; // El estado inicial del diálogo.
+let estadoConversacion = { modo: 'libre' };
 
-// --- REFERENCIAS AL DOM (se asignan al arrancar) ---
+// --- REFERENCIAS AL DOM ---
 let bootContainer, bootMessage, appContainer, history, chatInput, sendButton, navBar, screens;
 
 // --- SETUP INICIAL DE LA APLICACIÓN ---
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Vinculamos los elementos de la interfaz del index.html
     bootContainer = document.getElementById('boot-container');
     bootMessage = document.getElementById('boot-message');
     appContainer = document.getElementById('app-container');
@@ -24,15 +23,11 @@ document.addEventListener('DOMContentLoaded', () => {
     navBar = document.getElementById('nav-bar');
     screens = document.querySelectorAll('.screen');
 
-    // 2. Configuramos los botones y eventos
     setupEventListeners();
-    
-    // 3. Iniciamos la secuencia de arranque visual (LA VERSIÓN CORREGIDA)
     iniciarSecuenciaArranque();
 });
 
 function setupEventListeners() {
-    // Evento para el botón de enviar
     sendButton.addEventListener('click', () => {
         const comando = chatInput.value.trim();
         if (comando) {
@@ -40,14 +35,12 @@ function setupEventListeners() {
         }
     });
 
-    // Evento para la tecla "Enter" en el input
     chatInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             sendButton.click();
         }
     });
     
-    // Evento para la barra de navegación inferior
     navBar.addEventListener('click', (e) => {
         const targetButton = e.target.closest('.nav-button');
         if (!targetButton) return;
@@ -60,11 +53,31 @@ function setupEventListeners() {
     });
 }
 
-// --- SECUENCIA DE ARRANQUE VISUAL (¡CORREGIDA!) ---
+// --- NUEVAS FUNCIONES DE PERSISTENCIA CON LOCALSTORAGE ---
+function guardarHistorial() {
+    localStorage.setItem('guardian_chat_history', history.innerHTML);
+    localStorage.setItem('guardian_chat_state', JSON.stringify(estadoConversacion));
+}
+
+function cargarHistorial() {
+    const historialGuardado = localStorage.getItem('guardian_chat_history');
+    const estadoGuardado = localStorage.getItem('guardian_chat_state');
+
+    if (historialGuardado && estadoGuardado) {
+        history.innerHTML = historialGuardado;
+        estadoConversacion = JSON.parse(estadoGuardado);
+        history.scrollTop = history.scrollHeight;
+        return true; // Éxito: se cargó un historial.
+    }
+    
+    return false; // Fracaso: no había nada que cargar.
+}
+
+// --- SECUENCIA DE ARRANQUE VISUAL (CON PERSISTENCIA) ---
 function iniciarSecuenciaArranque() {
     const mensajes = [
         "Iniciando Guardian OS...",
-        "Estableciendo conexión con A.L.E. Core...",
+        "Verificando memoria persistente...",
         `Listo para la acción.`
     ];
     let i = 0;
@@ -75,18 +88,15 @@ function iniciarSecuenciaArranque() {
             i++;
             setTimeout(siguienteMensaje, 1200);
         } else {
-            // --- ¡LA TRANSICIÓN QUE FALTABA! ---
-            // 1. Ocultamos la pantalla de arranque.
             bootContainer.classList.add('hidden');
-            
-            // 2. Mostramos el contenedor principal de la aplicación con el chat.
             appContainer.classList.remove('hidden');
-            
-            // 3. Ponemos el foco en el campo de texto para que puedas escribir.
             chatInput.focus();
             
-            // 4. Pedimos el saludo inicial para que aparezca DENTRO del chat.
-            llamarALE("_SALUDO_INICIAL_");
+            const historialCargado = cargarHistorial();
+            
+            if (!historialCargado) {
+                llamarALE("_SALUDO_INICIAL_");
+            }
         }
     }
     siguienteMensaje();
@@ -106,17 +116,15 @@ function addUserMessage(texto) {
     messageBubble.textContent = texto;
     history.appendChild(messageBubble);
     history.scrollTop = history.scrollHeight;
+    guardarHistorial(); // Guardamos después de añadir mensaje de usuario.
 }
 
-// En tu main.js, reemplaza la función addGuardianMessage por esta:
-
-// Reemplaza tu función addGuardianMessage por esta:
 function addGuardianMessage(texto, conTypewriter = true) {
     const messageBubble = document.createElement('div');
     messageBubble.className = 'message-bubble guardian-message';
     history.appendChild(messageBubble);
     
-    if (conTypewriter && texto) { // Añadida comprobación de que 'texto' no sea nulo
+    if (conTypewriter && texto) {
         let i = 0;
         const speed = 20;
         
@@ -126,15 +134,17 @@ function addGuardianMessage(texto, conTypewriter = true) {
                 i++;
                 history.scrollTop = history.scrollHeight;
                 setTimeout(typeWriter, speed);
+            } else {
+                guardarHistorial(); // Guardamos cuando termina de escribir.
             }
         }
         typeWriter();
     } else {
         messageBubble.textContent = texto;
+        guardarHistorial(); // Guardamos para mensajes sin animación.
     }
     history.scrollTop = history.scrollHeight;
 }
-
 
 function showThinkingIndicator() {
     if (document.getElementById('thinking-bubble')) return;
@@ -152,8 +162,6 @@ function removeThinkingIndicator() {
 }
 
 // --- FUNCIÓN PARA LA RULETA VISUAL ---
-// En tu main.js, reemplaza la función mostrarRuleta por esta:
-
 function mostrarRuleta(opciones) {
     const ruletaContainer = document.createElement('div');
     ruletaContainer.className = 'ruleta-container';
@@ -183,34 +191,22 @@ function mostrarRuleta(opciones) {
         shuffleCount++;
         
         if (shuffleCount >= maxShuffles) {
-            clearInterval(intervalId); // Detenemos la animación, pero NO borramos la ruleta.
-            
+            clearInterval(intervalId);
             const eleccionFinal = opcionesEl[randomIndex].textContent;
             
-            // --- ¡AQUÍ ESTÁ LA NUEVA LÓGICA! ---
-
-            // 1. Inmediatamente enviamos la elección al cerebro.
-            // El cerebro responderá con el mensaje de confirmación ("Misión elegida: ...")
-            // y ese mensaje aparecerá en pantalla MIENTRAS la ruleta todavía es visible.
             llamarALE(eleccionFinal);
 
-            // 2. Esperamos un par de segundos para que el usuario vea todo junto.
             setTimeout(() => {
-                // 3. Ahora sí, limpiamos la ruleta de la pantalla.
                 ruletaContainer.remove();
-                
-                // 4. Y reactivamos la caja de texto para que el usuario pueda continuar.
                 chatInput.disabled = false;
                 sendButton.disabled = false;
                 chatInput.focus();
-            }, 2500); // Le damos 2.5 segundos. Puedes ajustar este tiempo.
+            }, 2500);
         }
     }, shuffleInterval);
 }
 
-
 // --- LÓGICA DE COMUNICACIÓN CON EL CEREBRO (A.L.E.) ---
-// En tu main.js, reemplaza la función llamarALE por esta:
 async function llamarALE(comando) {
     showThinkingIndicator();
 
@@ -232,22 +228,20 @@ async function llamarALE(comando) {
         const respuesta = await respuestaServidor.json();
         removeThinkingIndicator();
 
-        // --- LÓGICA SIMPLIFICADA Y ALINEADA CON EL BACKEND ESTABLE ---
-
-        // 1. Si hay una acción UI (como la ruleta), la ejecutamos.
         if (respuesta.accion_ui) {
             if (respuesta.accion_ui === 'MOSTRAR_RULETA') {
                 mostrarRuleta(respuesta.opciones_ruleta);
             }
         } 
-        // 2. Si no hay acción, pero sí un mensaje, lo mostramos.
         else if (respuesta.mensaje_para_ui) {
             addGuardianMessage(respuesta.mensaje_para_ui, true);
         }
 
-        // 3. SIEMPRE actualizamos el estado de la conversación.
         if (respuesta.nuevo_estado) {
             estadoConversacion = respuesta.nuevo_estado;
+            // Guardamos el estado después de recibirlo del servidor.
+            // Esto es importante para que el estado también sea persistente.
+            guardarHistorial();
         }
 
     } catch (error) {
@@ -256,5 +250,3 @@ async function llamarALE(comando) {
         addGuardianMessage("Error de conexión con el núcleo A.L.E. Revisa la consola.", false);
     }
 }
-
-
