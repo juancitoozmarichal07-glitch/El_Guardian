@@ -1,9 +1,10 @@
 # =================================================================
-# GUARDIAN.PY (v3.2.1 - Versión Limpia y Final)
+# GUARDIAN.PY (v3.2.4 - El Estratega Definitivo)
 # =================================================================
-# Esta versión integra la lógica del "Estratega de Bloques Aleatorios"
-# con la importación limpia de g4f, asumiendo que la versión 0.6.1.5
-# está fijada en las dependencias del proyecto.
+# Versión final que incluye todas las reglas de inteligencia:
+# - Condición de entrada: Bache total > 20 min para poder iniciar.
+# - Lógica de "Tarea Única Inteligente" para baches pequeños.
+# - Asignación aleatoria en bloques de 5 para baches grandes.
 
 import g4f
 import re
@@ -16,7 +17,7 @@ class Guardian:
         """
         Inicializa el especialista Guardian.
         """
-        print(f"    - Especialista 'Guardian' v3.2.1 (Limpia y Final) listo.")
+        print(f"    - Especialista 'Guardian' v3.2.4 (Estratega Definitivo) listo.")
 
     def _extraer_duracion_de_tarea(self, texto_tarea):
         """
@@ -135,31 +136,42 @@ class Guardian:
 
     def _crear_plan_de_transicion(self, tareas, bache_utilizable):
         """
-        Asigna duraciones aleatorias (20-45 min, en bloques de 5) a las
-        tareas, sin exceder el tiempo del bache.
+        Asigna duraciones a las tareas con dos lógicas:
+        1. Si el tiempo es poco para todas, elige UNA y le da el máximo.
+        2. Si hay tiempo, distribuye aleatoriamente entre todas.
         """
+        num_tareas = len(tareas)
+        if num_tareas == 0:
+            return []
+
+        # Lógica de "Tarea Única Inteligente"
+        if bache_utilizable < num_tareas * 20:
+            tarea_unica = random.choice(tareas)
+            duracion = min(bache_utilizable, 45)
+            duracion = 5 * round(duracion / 5)
+            if duracion < 20: return []
+            return [f"{tarea_unica} ({duracion} min)"]
+
+        # Lógica Normal (distribución aleatoria)
         plan_final = []
         tiempo_restante = bache_utilizable
         random.shuffle(tareas)
         bloques_de_tiempo = [20, 25, 30, 35, 40, 45]
 
         for tarea in tareas:
-            if tiempo_restante < 20:
-                break
-            
-            posibles_bloques = [b for b in bloques_de_tiempo if b <= tiempo_restante]
-            if not posibles_bloques:
-                continue
-
-            duracion_asignada = random.choice(posibles_bloques)
+            if tiempo_restante < 20: break
+            bloques_posibles = [b for b in bloques_de_tiempo if b <= tiempo_restante]
+            if not bloques_posibles: continue
+            duracion_asignada = random.choice(bloques_posibles)
             plan_final.append(f"{tarea} ({duracion_asignada} min)")
             tiempo_restante -= duracion_asignada
         
+        plan_final.sort()
         return plan_final
 
     def _gestionar_transicion(self, estado_actual, comando):
         """
-        Maneja el nuevo flujo del "Guardián Estratega".
+        Maneja el flujo del "Guardián Estratega" con todas las reglas.
         """
         paso = estado_actual.get("paso_transicion")
         datos_bache = estado_actual.get("datos_bache", {})
@@ -179,11 +191,16 @@ class Guardian:
                     fecha_inicio_madre += timedelta(days=1)
                 
                 bache_total_minutos = int((fecha_inicio_madre - ahora).total_seconds() / 60)
+
+                # Condición de entrada: el bache total debe ser viable.
+                if bache_total_minutos <= 20:
+                    return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": f"El bache de solo {bache_total_minutos} minutos es demasiado corto para activar el Modo Transición."}
+
                 colchon_seguridad = random.randint(10, 20)
                 bache_utilizable = bache_total_minutos - colchon_seguridad
 
                 if bache_utilizable < 20:
-                    return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Bache de tiempo insuficiente para planificar. Reiniciando."}
+                    return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": f"Tras restar el colchón de seguridad de {colchon_seguridad} min, el tiempo restante es insuficiente. Reiniciando."}
 
                 datos_bache["bache_utilizable_minutos"] = bache_utilizable
                 horas, minutos = divmod(bache_utilizable, 60)
@@ -203,7 +220,7 @@ class Guardian:
             plan_generado = self._crear_plan_de_transicion(tareas_objetivo, bache_utilizable)
 
             if not plan_generado:
-                return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "No se pudo generar un plan con el tiempo disponible. Intenta con un bache más grande."}
+                return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "No se pudo generar un plan viable con el tiempo disponible. Intenta con menos tareas o un bache más grande."}
 
             plan_texto = "\n".join([f"**{i+1}.** {tarea}" for i, tarea in enumerate(plan_generado)])
             tiempo_total_planificado = sum(self._extraer_duracion_de_tarea(t) for t in plan_generado)
