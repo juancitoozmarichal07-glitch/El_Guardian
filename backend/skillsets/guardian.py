@@ -1,30 +1,22 @@
 # =================================================================
-# GUARDIAN.PY (v2.1 - Corregido para Despliegue en Render/Vercel)
+# GUARDIAN.PY (v2.2 - Con Importación Retrasada para Despliegue)
 # =================================================================
-# Se ajusta la llamada a g4f para evitar errores de importación
-# de proveedores en entornos de producción.
+# Se mueve la importación de g4f dentro de la función que la usa
+# para evitar errores de carga de proveedores durante el arranque del servidor.
 
-import g4f
+# NO importamos g4f aquí
 import re
 from datetime import datetime, timedelta
-
-# --- ¡CONFIGURACIÓN IMPORTANTE PARA G4F! ---
-# Establecemos un proveedor por defecto que es conocido por ser estable.
-# Esto evita que g4f intente cargar proveedores que pueden fallar en Render.
-g4f.debug.logging = False # Opcional: Desactiva los logs detallados de g4f
-g4f.debug.check_version = False # Opcional: Desactiva la comprobación de versión
 
 class Guardian:
     def __init__(self):
         """
         Inicializa el especialista Guardian.
         """
-        print(f"    - Especialista 'Guardian' v2.1 (Corregido para Despliegue) listo.")
+        print(f"    - Especialista 'Guardian' v2.2 (Con Importación Retrasada) listo.")
 
     def _extraer_duracion_de_tarea(self, texto_tarea):
-        """
-        Extrae un número de minutos de un string como 'Tarea (30 min)'.
-        """
+        # ... (código sin cambios)
         match = re.search(r'\((\d+)\s*min\)', texto_tarea)
         if match:
             return int(match.group(1))
@@ -34,8 +26,7 @@ class Guardian:
         return 0
 
     def _gestionar_diseno(self, estado_actual, comando):
-        # ... (Esta función no necesita cambios, la omito por brevedad)
-        # ... (Pega aquí tu función _gestionar_diseno completa)
+        # ... (Pega aquí tu función _gestionar_diseno completa, sin cambios)
         paso = estado_actual.get("paso_diseno")
         datos_plan = estado_actual.get("datos_plan", {})
 
@@ -131,10 +122,8 @@ class Guardian:
 
         return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo de diseño. Reiniciando."}
 
-
     def _forjar_contrato(self, datos_plan):
-        # ... (Esta función no necesita cambios, la omito por brevedad)
-        # ... (Pega aquí tu función _forjar_contrato completa)
+        # ... (Pega aquí tu función _forjar_contrato completa, sin cambios)
         mision_base = datos_plan.get('mision', 'N/A')
         especificaciones = datos_plan.get('especificaciones', [])
         mision_completa = f"{mision_base} -> {' -> '.join(especificaciones)}" if especificaciones else mision_base
@@ -150,8 +139,7 @@ class Guardian:
         return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": contrato_texto}
 
     def _gestionar_transicion(self, estado_actual, comando):
-        # ... (Esta función no necesita cambios, la omito por brevedad)
-        # ... (Pega aquí tu función _gestionar_transicion completa)
+        # ... (Pega aquí tu función _gestionar_transicion completa, sin cambios)
         paso = estado_actual.get("paso_transicion")
         datos_bache = estado_actual.get("datos_bache", {})
 
@@ -234,22 +222,21 @@ class Guardian:
 
         return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo de transición. Reiniciando."}
 
-
     # --- FUNCIÓN DE CHARLA (¡MODIFICADA!) ---
     async def _gestionar_charla_ia(self, comando):
         """
-        Maneja la conversación libre usando g4f, con un proveedor estable.
+        Maneja la conversación libre, importando g4f solo cuando es necesario.
         """
+        # --- ¡LA CLAVE ESTÁ AQUÍ! ---
+        import g4f
+        
         try:
             prompt = f"Eres el Guardián, una IA compañera de Juan. Eres directo, sabio y motivador. El usuario dice: '{comando}'"
             
-            # Usamos el modelo por defecto, que ahora hemos configurado para ser más estable.
-            # No es necesario especificar el proveedor aquí si ya está configurado globalmente,
-            # pero hacerlo explícito en la llamada es aún más seguro.
+            # Llamada limpia, sin especificar proveedor, como pediste.
             respuesta_ia = await g4f.ChatCompletion.create_async(
                 model=g4f.models.default,
-                messages=[{"role": "user", "content": prompt}],
-                provider=g4f.Provider.Bing  # Forzamos el uso de Bing para máxima estabilidad
+                messages=[{"role": "user", "content": prompt}]
             )
             return respuesta_ia or "No he podido procesar eso. Intenta de nuevo."
         except Exception as e:
@@ -257,8 +244,7 @@ class Guardian:
             return "Mi núcleo cognitivo tuvo una sobrecarga. Inténtalo de nuevo."
 
     async def ejecutar(self, datos):
-        # ... (Esta función no necesita cambios, la omito por brevedad)
-        # ... (Pega aquí tu función ejecutar completa)
+        # ... (Pega aquí tu función ejecutar completa, sin cambios)
         estado = datos.get("estado_conversacion", {"modo": "libre"})
         comando = datos.get("comando", "")
 
