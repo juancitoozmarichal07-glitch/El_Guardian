@@ -1,18 +1,39 @@
 # =================================================================
-# GUARDIAN.PY (v1.0 - ESTABLE)
+# GUARDIAN.PY (v2.0 - Con Modo Transición Cíclico)
 # =================================================================
-# Este es el skillset del Guardián. Contiene toda la lógica para
-# el diálogo, la creación de ruletas y la forja de contratos.
+# Este es el skillset del Guardián. Contiene la lógica para
+# el diálogo, la creación de ruletas, la forja de contratos
+# y el nuevo modo de transición para gestionar baches de tiempo.
 
 import g4f
+import re
+from datetime import datetime, timedelta
 
 class Guardian:
     def __init__(self):
         """
         Inicializa el especialista Guardian.
         """
-        print(f"    - Especialista 'Guardian' v1.0 (Estable) listo.")
+        print(f"    - Especialista 'Guardian' v2.0 (Con Modo Transición) listo.")
 
+    # --- NUEVA FUNCIÓN AUXILIAR ---
+    def _extraer_duracion_de_tarea(self, texto_tarea):
+        """
+        Extrae un número de minutos de un string como 'Tarea (30 min)'.
+        Devuelve los minutos como entero o 0 si no lo encuentra.
+        """
+        match = re.search(r'\((\d+)\s*min\)', texto_tarea)
+        if match:
+            return int(match.group(1))
+        
+        # Intenta buscar solo el número si no encuentra "min"
+        match_num = re.search(r'\((\d+)\)', texto_tarea)
+        if match_num:
+            return int(match_num.group(1))
+            
+        return 0 # Devuelve 0 si no se especifica duración
+
+    # --- GESTOR DEL MODO DISEÑO (Sin cambios) ---
     def _gestionar_diseno(self, estado_actual, comando):
         """
         Maneja toda la lógica del flujo de "Modo Diseño".
@@ -110,7 +131,7 @@ class Guardian:
             datos_plan["duracion"] = comando
             return self._forjar_contrato(datos_plan)
 
-        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo. Reiniciando."}
+        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo de diseño. Reiniciando."}
 
     def _forjar_contrato(self, datos_plan):
         """
@@ -130,6 +151,93 @@ class Guardian:
         nuevo_estado = {"modo": "libre"}
         return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": contrato_texto}
 
+    # --- NUEVO GESTOR DEL MODO TRANSICIÓN ---
+    def _gestionar_transicion(self, estado_actual, comando):
+        """
+        Maneja la lógica del flujo cíclico de "Modo Transición".
+        """
+        paso = estado_actual.get("paso_transicion")
+        datos_bache = estado_actual.get("datos_bache", {})
+
+        # PASO 1: Esperando la actividad madre
+        if paso == "ESPERANDO_ACTIVIDAD_MADRE":
+            datos_bache["actividad_madre"] = comando
+            nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_HORA_INICIO_MADRE", "datos_bache": datos_bache}
+            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Entendido: **{comando}**. ¿A qué hora comienza?"}
+
+        # PASO 2: Esperando la hora de inicio y calculando el bache inicial
+        elif paso == "ESPERANDO_HORA_INICIO_MADRE":
+            try:
+                hora_inicio_madre = datetime.strptime(comando, "%H:%M").time()
+                ahora = datetime.now()
+                fecha_inicio_madre = datetime.combine(ahora.date(), hora_inicio_madre)
+                
+                if fecha_inicio_madre < ahora:
+                    fecha_inicio_madre += timedelta(days=1)
+
+                bache_total_minutos = int((fecha_inicio_madre - ahora).total_seconds() / 60)
+
+                if bache_total_minutos <= 5:
+                    return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "El bache de tiempo es muy corto. Reiniciando."}
+
+                datos_bache["hora_inicio_madre"] = comando
+                datos_bache["bache_restante_minutos"] = bache_total_minutos
+                
+                horas, minutos = divmod(bache_total_minutos, 60)
+                mensaje_bache = f"Detectado un bache de **{horas}h y {minutos}min** hasta '{datos_bache['actividad_madre']}'.\n\nDefine las tareas de transición (ej: Tarea 1 (20 min))."
+
+                nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_OPCIONES_TRANSICION", "datos_bache": datos_bache}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": mensaje_bache}
+
+            except ValueError:
+                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Formato de hora no válido. Usa HH:MM (ej: 23:50)."}
+
+        # PASO 3: Esperando las opciones para la ruleta
+        elif paso == "ESPERANDO_OPCIONES_TRANSICION":
+            opciones = [opt.strip() for opt in comando.split(',') if opt.strip()]
+            if not opciones:
+                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Necesito al menos una opción de tarea."}
+            
+            estado_actual["paso_transicion"] = "ESPERANDO_RESULTADO_TRANSICION"
+            return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
+
+        # PASO 4: Procesar resultado, forjar contrato y decidir si continuar
+        elif paso == "ESPERANDO_RESULTADO_TRANSICION":
+            tarea_elegida = comando
+            duracion_tarea = self._extraer_duracion_de_tarea(tarea_elegida)
+
+            bache_anterior = datos_bache.get("bache_restante_minutos", 0)
+            nuevo_bache = bache_anterior - duracion_tarea
+            datos_bache["bache_restante_minutos"] = nuevo_bache
+
+            contrato_texto = (
+                f"**CONTRATO DE TRANSICIÓN FORJADO**\n--------------------\n"
+                f"**Misión Actual:** **{tarea_elegida}**\n"
+                f"**Tiempo Restante en Bache:** {nuevo_bache} minutos\n"
+                f"**Actividad Madre:** {datos_bache.get('actividad_madre')} (a las {datos_bache.get('hora_inicio_madre')})\n--------------------"
+            )
+
+            if nuevo_bache < 10: # Umbral mínimo para continuar
+                mensaje_final = f"{contrato_texto}\n\nBache de tiempo casi agotado. Prepárate para '{datos_bache.get('actividad_madre')}'. Saliendo de modo transición."
+                return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": mensaje_final}
+            else:
+                nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_DECISION_CONTINUAR", "datos_bache": datos_bache}
+                mensaje_continuacion = f"{contrato_texto}\n\n¿Forjamos otro contrato para los {nuevo_bache} minutos restantes? (sí/no)"
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": mensaje_continuacion}
+
+        # PASO 5: Esperar decisión de continuar el ciclo
+        elif paso == "ESPERANDO_DECISION_CONTINUAR":
+            if "si" in comando.lower():
+                bache_restante = datos_bache.get("bache_restante_minutos", 0)
+                horas, minutos = divmod(bache_restante, 60)
+                mensaje_peticion = f"Entendido. Quedan **{horas}h y {minutos}min**. Define las nuevas tareas de transición."
+                nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_OPCIONES_TRANSICION", "datos_bache": datos_bache}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": mensaje_peticion}
+            else:
+                return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "De acuerdo. Saliendo de modo transición."}
+
+        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo de transición. Reiniciando."}
+
     async def _gestionar_charla_ia(self, comando):
         """
         Maneja la conversación libre usando g4f.
@@ -145,6 +253,7 @@ class Guardian:
             print(f"🚨 Error en la llamada a g4f: {e}")
             return "Mi núcleo cognitivo tuvo una sobrecarga. Inténtalo de nuevo."
 
+    # --- PUNTO DE ENTRADA PRINCIPAL (ACTUALIZADO) ---
     async def ejecutar(self, datos):
         """
         El punto de entrada que es llamado por A.L.E. Core.
@@ -153,20 +262,28 @@ class Guardian:
         comando = datos.get("comando", "")
 
         if comando == "_SALUDO_INICIAL_":
-            return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Guardián online. ¿Forjamos un Contrato o necesitas conversar?"}
+            return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Guardián online. ¿Forjamos un Contrato o preparamos una Transición?"}
 
         palabras_clave_diseno = ["diseñar", "contrato", "forjar", "crear", "ruleta", "modo diseño"]
+        palabras_clave_transicion = ["transicion", "bache", "preparar"] # <-- NUEVO
+
+        # Activar Modo Transición
+        if any(palabra in comando.lower() for palabra in palabras_clave_transicion) and estado.get("modo") != "transicion":
+            nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_ACTIVIDAD_MADRE", "datos_bache": {}}
+            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Transición activado. ¿Cuál es la actividad principal para la que nos preparamos?"}
         
-        # Si el usuario pide entrar en modo diseño y no está ya en él.
+        # Activar Modo Diseño
         if any(palabra in comando.lower() for palabra in palabras_clave_diseno) and estado.get("modo") != "diseño":
             nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_MISION", "datos_plan": {}}
             return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Diseño activado. Define la misión."}
 
-        # Si ya estamos en modo diseño, pasamos el control al gestor de diseño.
+        # Gestionar los flujos si ya estamos en un modo
         if estado.get("modo") == "diseño":
             return self._gestionar_diseno(estado, comando)
+        
+        if estado.get("modo") == "transicion":
+            return self._gestionar_transicion(estado, comando)
 
         # Si no, es una conversación normal.
         respuesta_conversacional = await self._gestionar_charla_ia(comando)
         return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": respuesta_conversacional}
-
