@@ -1,9 +1,10 @@
 # =================================================================
-# GUARDIAN.PY (v3.7 - El Editor Universal)
+# GUARDIAN.PY (v3.8 - El Guardián con Memoria)
 # =================================================================
-# Esta versión perfecciona el "Modo Diseño", permitiendo al usuario
-# introducir múltiples opciones (para activar la ruleta) en cualquier
-# campo durante el ciclo de corrección.
+# Esta versión corrige el bug de "amnesia" en el Modo Diseño.
+# Ahora, al usar la ruleta en una corrección, el Guardián recuerda
+# su contexto y vuelve a presentar el borrador actualizado sin
+# reiniciar el flujo de creación.
 
 import g4f
 import re
@@ -16,7 +17,7 @@ class Guardian:
         """
         Inicializa el especialista Guardian.
         """
-        print(f"    - Especialista 'Guardian' v3.7 (Editor Universal) listo.")
+        print(f"    - Especialista 'Guardian' v3.8 (Guardián con Memoria) listo.")
 
     # --- FUNCIONES AUXILIARES (Sin cambios) ---
     def _extraer_duracion_de_tarea(self, texto_tarea):
@@ -131,6 +132,12 @@ class Guardian:
                 return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
         
         elif paso == "ESPERANDO_RESULTADO_MISION":
+            if datos_plan.get("corrigiendo_con_ruleta"):
+                datos_plan.pop("corrigiendo_con_ruleta", None)
+                datos_plan.pop("campo_en_edicion", None)
+                datos_plan["mision"] = comando
+                return self._presentar_borrador_contrato(datos_plan)
+            
             datos_plan["mision"] = comando
             nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ESPECIFICACION", "datos_plan": datos_plan}
             return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Misión elegida: **{comando}**. ¿Necesitas especificar más? (sí/no)"}
@@ -175,6 +182,12 @@ class Guardian:
                 return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
                 
         elif paso == "ESPERANDO_RESULTADO_ARRANQUE":
+            if datos_plan.get("corrigiendo_con_ruleta"):
+                datos_plan.pop("corrigiendo_con_ruleta", None)
+                datos_plan.pop("campo_en_edicion", None)
+                datos_plan["arranque"] = comando
+                return self._presentar_borrador_contrato(datos_plan)
+
             datos_plan["arranque"] = comando
             nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_DECISION_DURACION", "datos_plan": datos_plan}
             return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Arranque: **{comando}**. ¿Necesitas definir una duración? (sí/no)"}
@@ -198,6 +211,12 @@ class Guardian:
                 return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
                 
         elif paso == "ESPERANDO_RESULTADO_DURACION":
+            if datos_plan.get("corrigiendo_con_ruleta"):
+                datos_plan.pop("corrigiendo_con_ruleta", None)
+                datos_plan.pop("campo_en_edicion", None)
+                datos_plan["duracion"] = comando
+                return self._presentar_borrador_contrato(datos_plan)
+
             datos_plan["duracion"] = comando
             return self._presentar_borrador_contrato(datos_plan)
 
@@ -226,7 +245,7 @@ class Guardian:
             campo_en_edicion = datos_plan.get("campo_en_edicion")
             opciones = [opt.strip() for opt in comando.split(',') if opt.strip()]
             
-            if len(opciones) == 1: # Si es un solo valor
+            if len(opciones) == 1:
                 datos_plan.pop("campo_en_edicion", None)
                 if campo_en_edicion == "misión":
                     datos_plan["mision"] = comando
@@ -235,7 +254,7 @@ class Guardian:
                     datos_plan[campo_en_edicion] = comando
                 return self._presentar_borrador_contrato(datos_plan)
             
-            else: # Si son múltiples valores, activamos la ruleta
+            else:
                 mapa_pasos = {
                     "misión": "ESPERANDO_RESULTADO_MISION",
                     "arranque": "ESPERANDO_RESULTADO_ARRANQUE",
@@ -243,6 +262,7 @@ class Guardian:
                 }
                 paso_siguiente = mapa_pasos.get(campo_en_edicion)
                 if paso_siguiente:
+                    datos_plan["corrigiendo_con_ruleta"] = True
                     estado_actual["paso_diseno"] = paso_siguiente
                     return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
                 else:
