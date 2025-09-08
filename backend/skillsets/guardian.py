@@ -1,10 +1,8 @@
 # =================================================================
-# GUARDIAN.PY (v3.2.4 - El Estratega Definitivo)
+# GUARDIAN.PY (v3.3 - El Agendador)
 # =================================================================
-# Versión final que incluye todas las reglas de inteligencia:
-# - Condición de entrada: Bache total > 20 min para poder iniciar.
-# - Lógica de "Tarea Única Inteligente" para baches pequeños.
-# - Asignación aleatoria en bloques de 5 para baches grandes.
+# Esta versión añade la capacidad de crear un itinerario detallado
+# con horarios y descansos para el Modo Transición.
 
 import g4f
 import re
@@ -17,7 +15,7 @@ class Guardian:
         """
         Inicializa el especialista Guardian.
         """
-        print(f"    - Especialista 'Guardian' v3.2.4 (Estratega Definitivo) listo.")
+        print(f"    - Especialista 'Guardian' v3.3 (El Agendador) listo.")
 
     def _extraer_duracion_de_tarea(self, texto_tarea):
         """
@@ -30,6 +28,43 @@ class Guardian:
         if match_num:
             return int(match_num.group(1))
         return 0
+
+    def _calendarizar_plan(self, plan_generado, zona_horaria):
+        """
+        Toma una lista de tareas con duraciones y la convierte en un itinerario
+        con horarios de inicio, fin y descansos.
+        """
+        if not plan_generado:
+            return [], 0
+
+        itinerario_final = []
+        minutos_descanso_totales = 0
+        
+        hora_actual = datetime.now(zona_horaria)
+        proxima_hora_inicio = hora_actual
+
+        for i, tarea_texto in enumerate(plan_generado):
+            duracion_minutos = self._extraer_duracion_de_tarea(tarea_texto)
+            if duracion_minutos == 0:
+                continue
+
+            hora_fin = proxima_hora_inicio + timedelta(minutes=duracion_minutos)
+
+            texto_itinerario = (
+                f"{proxima_hora_inicio.strftime('%H:%M')} - "
+                f"{hora_fin.strftime('%H:%M')}: {tarea_texto}"
+            )
+            itinerario_final.append(texto_itinerario)
+
+            if i < len(plan_generado) - 1:
+                descanso_minutos = random.randint(5, 10)
+                minutos_descanso_totales += descanso_minutos
+                
+                itinerario_final.append(f"*(Descanso de {descanso_minutos} minutos)*")
+                
+                proxima_hora_inicio = hora_fin + timedelta(minutes=descanso_minutos)
+
+        return itinerario_final, minutos_descanso_totales
 
     def _gestionar_diseno(self, estado_actual, comando):
         """
@@ -144,7 +179,6 @@ class Guardian:
         if num_tareas == 0:
             return []
 
-        # Lógica de "Tarea Única Inteligente"
         if bache_utilizable < num_tareas * 20:
             tarea_unica = random.choice(tareas)
             duracion = min(bache_utilizable, 45)
@@ -152,7 +186,6 @@ class Guardian:
             if duracion < 20: return []
             return [f"{tarea_unica} ({duracion} min)"]
 
-        # Lógica Normal (distribución aleatoria)
         plan_final = []
         tiempo_restante = bache_utilizable
         random.shuffle(tareas)
@@ -166,12 +199,11 @@ class Guardian:
             plan_final.append(f"{tarea} ({duracion_asignada} min)")
             tiempo_restante -= duracion_asignada
         
-        plan_final.sort()
         return plan_final
 
     def _gestionar_transicion(self, estado_actual, comando):
         """
-        Maneja el flujo del "Guardián Estratega" con todas las reglas.
+        Maneja el flujo del "Guardián Estratega y Agendador".
         """
         paso = estado_actual.get("paso_transicion")
         datos_bache = estado_actual.get("datos_bache", {})
@@ -192,7 +224,6 @@ class Guardian:
                 
                 bache_total_minutos = int((fecha_inicio_madre - ahora).total_seconds() / 60)
 
-                # Condición de entrada: el bache total debe ser viable.
                 if bache_total_minutos <= 20:
                     return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": f"El bache de solo {bache_total_minutos} minutos es demasiado corto para activar el Modo Transición."}
 
@@ -222,17 +253,21 @@ class Guardian:
             if not plan_generado:
                 return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "No se pudo generar un plan viable con el tiempo disponible. Intenta con menos tareas o un bache más grande."}
 
-            plan_texto = "\n".join([f"**{i+1}.** {tarea}" for i, tarea in enumerate(plan_generado)])
+            itinerario_agendado, total_descansos = self._calendarizar_plan(plan_generado, zona_horaria_usuario)
+
+            plan_texto = "\n".join([f"**-** {linea}" for linea in itinerario_agendado])
+            
             tiempo_total_planificado = sum(self._extraer_duracion_de_tarea(t) for t in plan_generado)
-            tiempo_libre_restante = bache_utilizable - tiempo_total_planificado
+            tiempo_total_usado = tiempo_total_planificado + total_descansos
+            tiempo_libre_restante = bache_utilizable - tiempo_total_usado
             
             mensaje_final = (
-                f"**PLAN DE TRANSICIÓN FORJADO**\n--------------------\n"
-                f"He preparado el siguiente plan para tu bache de tiempo:\n\n"
+                f"**PLAN DE TRANSICIÓN AGENDADO**\n--------------------\n"
+                f"He preparado el siguiente itinerario para tu bache de tiempo:\n\n"
                 f"{plan_texto}\n\n"
-                f"**Tiempo total planificado:** {tiempo_total_planificado} minutos.\n"
+                f"**Tiempo total planificado:** {tiempo_total_planificado} minutos de trabajo.\n"
                 f"**Tiempo libre no asignado:** {tiempo_libre_restante} minutos.\n--------------------\n"
-                f"¡A la carga! El plan está sellado."
+                f"¡Itinerario sellado! Puedes registrar estas tareas en tu app."
             )
             return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": mensaje_final}
 
@@ -264,7 +299,7 @@ class Guardian:
             return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Guardián online. ¿Forjamos un Contrato o preparamos una Transición?"}
 
         palabras_clave_diseno = ["diseñar", "contrato", "forjar", "crear", "ruleta", "modo diseño"]
-        palabras_clave_transicion = ["transicion", "bache", "preparar", "plan"]
+        palabras_clave_transicion = ["transicion", "bache", "preparar", "plan", "agendar"]
         
         if any(palabra in comando.lower() for palabra in palabras_clave_transicion) and estado.get("modo") != "transicion":
             nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_ACTIVIDAD_MADRE", "datos_bache": {}}
