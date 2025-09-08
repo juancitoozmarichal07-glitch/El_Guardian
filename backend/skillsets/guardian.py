@@ -22,7 +22,7 @@ class Guardian:
         """
         Extrae la duración en minutos de un string como "(20 min)" o "(20)".
         """
-        match = re.search(r'\((\d+)\s*min\)', texto_tarea)
+        match = re.search(r'\((\d+)\s*min\s*\)', texto_tarea)
         if match:
             return int(match.group(1))
         match_num = re.search(r'\((\d+)\)', texto_tarea)
@@ -69,13 +69,12 @@ class Guardian:
 
     def _crear_plan_de_transicion(self, tareas, bache_utilizable):
         """
-        Asigna duraciones a las tareas. Modificado para aceptar duraciones personalizadas.
+        Asigna duraciones a las tareas que no la tienen definida.
         """
         num_tareas = len(tareas)
         if num_tareas == 0:
             return []
 
-        # Lógica de "Tarea Única Inteligente" para baches pequeños
         if bache_utilizable < num_tareas * 20:
             tarea_unica = random.choice(tareas)
             duracion = min(bache_utilizable, 45)
@@ -83,13 +82,10 @@ class Guardian:
             if duracion < 20: return []
             return [f"{tarea_unica} ({duracion} min)"]
 
-        # Lógica Normal (distribución aleatoria)
         plan_final = []
         tiempo_restante = bache_utilizable
         random.shuffle(tareas)
         
-        # Regla del usuario: el tiempo puede ser menor a 20 si él lo define.
-        # La lógica aleatoria del guardián sigue respetando el mínimo de 20.
         bloques_de_tiempo = [20, 25, 30, 35, 40, 45]
 
         for tarea in tareas:
@@ -131,21 +127,118 @@ class Guardian:
         return plan_final
 
     def _gestionar_diseno(self, estado_actual, comando):
-        # El código de _gestionar_diseno no cambia, lo omito por brevedad
-        # pero debe estar aquí en tu archivo final.
+        """
+        Maneja toda la lógica del flujo de "Modo Diseño" para contratos normales.
+        """
         paso = estado_actual.get("paso_diseno")
         datos_plan = estado_actual.get("datos_plan", {})
-        # ... (pega aquí todo el código de la función _gestionar_diseno de la v3.3)
-        # ... es largo y no ha cambiado, para no hacer esta respuesta enorme.
-        # Si no lo tienes a mano, dímelo y te lo pongo.
-        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Flujo de diseño no implementado en este snippet."}
-
+        
+        if paso == "ESPERANDO_MISION":
+            opciones = [opt.strip() for opt in comando.split(',') if opt.strip()]
+            if not opciones:
+                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Define la misión."}
+            if len(opciones) == 1:
+                datos_plan["mision"] = opciones[0]
+                nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ESPECIFICACION", "datos_plan": datos_plan}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Misión: **{opciones[0]}**. ¿Necesitas especificar más? (sí/no)"}
+            else:
+                estado_actual["paso_diseno"] = "ESPERANDO_RESULTADO_MISION"
+                return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
+        
+        elif paso == "ESPERANDO_RESULTADO_MISION":
+            datos_plan["mision"] = comando
+            nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ESPECIFICACION", "datos_plan": datos_plan}
+            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Misión elegida: **{comando}**. ¿Necesitas especificar más? (sí/no)"}
+        
+        elif paso == "ESPERANDO_ESPECIFICACION":
+            if "si" in comando.lower():
+                nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_OPCIONES_ESPECIFICACION", "datos_plan": datos_plan}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Entendido. Dame las opciones para la siguiente capa."}
+            else:
+                nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ARRANQUE", "datos_plan": datos_plan}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Misión definida. Ahora, define el **momento de arranque**."}
+                
+        elif paso == "ESPERANDO_OPCIONES_ESPECIFICACION":
+            opciones = [opt.strip() for opt in comando.split(',') if opt.strip()]
+            if not opciones:
+                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Define las opciones."}
+            if "especificaciones" not in datos_plan: datos_plan["especificaciones"] = []
+            if len(opciones) == 1:
+                datos_plan["especificaciones"].append(opciones[0])
+                mision_completa = f"{datos_plan.get('mision', '')} -> {' -> '.join(datos_plan['especificaciones'])}"
+                nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ESPECIFICACION", "datos_plan": datos_plan}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Entendido: **{mision_completa}**. ¿Otra capa más? (sí/no)"}
+            else:
+                estado_actual["paso_diseno"] = "ESPERANDO_RESULTADO_ESPECIFICACION"
+                return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
+                
+        elif paso == "ESPERANDO_RESULTADO_ESPECIFICACION":
+            if "especificaciones" not in datos_plan: datos_plan["especificaciones"] = []
+            datos_plan["especificaciones"].append(comando)
+            mision_completa = f"{datos_plan.get('mision', '')} -> {' -> '.join(datos_plan['especificaciones'])}"
+            nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ESPECIFICACION", "datos_plan": datos_plan}
+            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Entendido: **{mision_completa}**. ¿Otra capa más? (sí/no)"}
+            
+        elif paso == "ESPERANDO_ARRANQUE":
+            opciones = [opt.strip() for opt in comando.split(',') if opt.strip()]
+            if not opciones: return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Define el momento de arranque."}
+            if len(opciones) == 1:
+                datos_plan["arranque"] = opciones[0]
+                nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_DECISION_DURACION", "datos_plan": datos_plan}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Arranque: **{opciones[0]}**. ¿Necesitas definir una duración? (sí/no)"}
+            else:
+                estado_actual["paso_diseno"] = "ESPERANDO_RESULTADO_ARRANQUE"
+                return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
+                
+        elif paso == "ESPERANDO_RESULTADO_ARRANQUE":
+            datos_plan["arranque"] = comando
+            nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_DECISION_DURACION", "datos_plan": datos_plan}
+            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Arranque: **{comando}**. ¿Necesitas definir una duración? (sí/no)"}
+            
+        elif paso == "ESPERANDO_DECISION_DURACION":
+            if "si" in comando.lower():
+                nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_DURACION", "datos_plan": datos_plan}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Entendido. Dime las opciones para la duración."}
+            else:
+                datos_plan["duracion"] = "No definida"
+                return self._forjar_contrato(datos_plan)
+                
+        elif paso == "ESPERANDO_DURACION":
+            opciones = [opt.strip() for opt in comando.split(',') if opt.strip()]
+            if not opciones: return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Define la duración."}
+            if len(opciones) == 1:
+                datos_plan["duracion"] = opciones[0]
+                return self._forjar_contrato(datos_plan)
+            else:
+                estado_actual["paso_diseno"] = "ESPERANDO_RESULTADO_DURACION"
+                return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
+                
+        elif paso == "ESPERANDO_RESULTADO_DURACION":
+            datos_plan["duracion"] = comando
+            return self._forjar_contrato(datos_plan)
+            
+        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo de diseño. Reiniciando."}
 
     def _forjar_contrato(self, datos_plan):
-        # El código de _forjar_contrato no cambia.
-        # ... (pega aquí el código de la función _forjar_contrato de la v3.3)
-        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Contrato forjado."}
-
+        """
+        Toma los datos recopilados y genera el mensaje final del contrato normal.
+        """
+        zona_horaria_usuario = pytz.timezone("America/Montevideo")
+        ahora = datetime.now(zona_horaria_usuario)
+        hora_sellado = ahora.strftime("%H:%M")
+        mision_base = datos_plan.get('mision', 'N/A')
+        especificaciones = datos_plan.get('especificaciones', [])
+        mision_completa = f"{mision_base} -> {' -> '.join(especificaciones)}" if especificaciones else mision_base
+        contrato_texto = (
+            f"**CONTRATO FORJADO**\n--------------------\n"
+            f"**Misión:** {mision_completa}\n"
+            f"**Arranque:** {datos_plan.get('arranque', 'N/A')}\n"
+            f"**Duración:** {datos_plan.get('duracion', 'N/A')}\n"
+            f"**Sellado a las:** {hora_sellado}\n--------------------\n"
+            f"Contrato sellado. ¿Siguiente misión?"
+        )
+        nuevo_estado = {"modo": "libre"}
+        return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": contrato_texto}
 
     def _gestionar_transicion(self, estado_actual, comando):
         """
@@ -156,13 +249,11 @@ class Guardian:
         zona_horaria_usuario = pytz.timezone("America/Montevideo")
 
         if paso == "ESPERANDO_ACTIVIDAD_MADRE":
-            # ... (código sin cambios)
             datos_bache["actividad_madre"] = comando
             nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_HORA_INICIO_MADRE", "datos_bache": datos_bache}
             return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Entendido: **{comando}**. ¿A qué hora comienza?"}
 
         elif paso == "ESPERANDO_HORA_INICIO_MADRE":
-            # ... (código sin cambios)
             try:
                 ahora = datetime.now(zona_horaria_usuario)
                 hora_inicio_madre = datetime.strptime(comando, "%H:%M").time()
@@ -196,7 +287,6 @@ class Guardian:
             if not plan_generado:
                 return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "No se pudo generar un plan viable con el tiempo disponible. Intenta con menos tareas o un bache más grande."}
 
-            # Guardamos el plan y pasamos a la confirmación
             datos_bache["plan_borrador"] = plan_generado
             plan_texto = "\n".join([f"- {tarea}" for tarea in plan_generado])
             mensaje = (
@@ -207,6 +297,7 @@ class Guardian:
             return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": mensaje}
 
         elif paso == "ESPERANDO_CONFIRMACION_PLAN":
+            plan_final = []
             if "aceptar" in comando.lower():
                 plan_final = datos_bache.get("plan_borrador", [])
             elif "modificar" in comando.lower():
@@ -219,7 +310,6 @@ class Guardian:
             else:
                 return {"nuevo_estado": estado_actual, "mensaje_para_ui": "No te he entendido. Por favor, responde 'aceptar' o 'modificar'."}
             
-            # Si el plan fue aceptado, se ejecuta el resto del código
             itinerario_agendado, total_descansos = self._calendarizar_plan(plan_final, zona_horaria_usuario)
             plan_texto = "\n".join([f"**-** {linea}" for linea in itinerario_agendado])
             tiempo_total_planificado = sum(self._extraer_duracion_de_tarea(t) for t in plan_final)
