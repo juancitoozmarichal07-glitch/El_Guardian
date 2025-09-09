@@ -26,22 +26,53 @@ class Guardian:
         if match_num: return int(match_num.group(1))
         return 0
 
+    def _redondear_hora_a_5_min(self, dt):
+        """Función para redondear una hora al siguiente múltiplo de 5 minutos."""
+        minutos_para_sumar = (5 - dt.minute % 5) % 5
+        return dt + timedelta(minutes=minutos_para_sumar)
+
     def _calendarizar_plan(self, plan_generado, zona_horaria):
+        """
+        MODIFICADO:
+        - Añade un "respiro" inicial antes de la primera tarea.
+        - Redondea todas las horas de inicio al siguiente múltiplo de 5 minutos.
+        """
         if not plan_generado: return [], 0
+        
         itinerario_final, minutos_descanso_totales = [], 0
         hora_actual = datetime.now(zona_horaria)
-        proxima_hora_inicio = hora_actual
+
+        # 1. Añadir respiro inicial y redondear la primera hora de inicio
+        respiro_inicial = random.randint(5, 10)
+        minutos_descanso_totales += respiro_inicial
+        proxima_hora_inicio_bruta = hora_actual + timedelta(minutes=respiro_inicial)
+        proxima_hora_inicio = self._redondear_hora_a_5_min(proxima_hora_inicio_bruta)
+        
+        itinerario_final.append(f"*(Respiro inicial de {respiro_inicial} minutos)*")
+
         for i, tarea_texto in enumerate(plan_generado):
             duracion_minutos = self._extraer_duracion_de_tarea(tarea_texto)
             if duracion_minutos == 0: continue
+
+            # Asegurarse de que la duración también sea un múltiplo de 5
+            duracion_minutos = 5 * round(duracion_minutos / 5)
+            
             hora_fin = proxima_hora_inicio + timedelta(minutes=duracion_minutos)
             texto_itinerario = f"{proxima_hora_inicio.strftime('%H:%M')} - {hora_fin.strftime('%H:%M')}: {tarea_texto}"
             itinerario_final.append(texto_itinerario)
+            
+            # Si no es la última tarea, añadir descanso y calcular la siguiente hora de inicio
             if i < len(plan_generado) - 1:
-                descanso_minutos = random.randint(5, 10)
+                descanso_minutos = random.choice([5, 10]) # Descansos fijos de 5 o 10
                 minutos_descanso_totales += descanso_minutos
                 itinerario_final.append(f"*(Descanso de {descanso_minutos} minutos)*")
+                
+                # La siguiente tarea empieza después del descanso
                 proxima_hora_inicio = hora_fin + timedelta(minutes=descanso_minutos)
+            else:
+                # Es la última tarea, no hay más descansos
+                proxima_hora_inicio = hora_fin
+
         return itinerario_final, minutos_descanso_totales
 
     def _crear_plan_de_transicion(self, tareas, bache_utilizable):
@@ -267,7 +298,7 @@ class Guardian:
                     return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en la corrección con ruleta. Reiniciando."}
             
         return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo de diseño. Reiniciando."}
-            # --- MODO TRANSICIÓN (v4.0 - CON CICLO DE CORRECCIÓN) ---
+    # --- MODO TRANSICIÓN (v4.0 - CON CICLO DE CORRECCIÓN) ---
     def _presentar_borrador_transicion(self, datos_bache):
         plan_borrador = datos_bache.get("plan_borrador", [])
         if not plan_borrador:
@@ -467,4 +498,3 @@ class Guardian:
         # --- MODO CHARLA POR DEFECTO ---
         respuesta_conversacional = await self._gestionar_charla_ia(comando)
         return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": respuesta_conversacional}
-
