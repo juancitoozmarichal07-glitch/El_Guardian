@@ -429,13 +429,13 @@ class Guardian:
             print(f"🚨 Error en la llamada a g4f: {e}")
             return "Mi núcleo cognitivo tuvo una sobrecarga. Inténtalo de nuevo."
 
-        async def ejecutar(self, datos):
+    async def ejecutar(self, datos):
         """
         El punto de entrada que es llamado por A.L.E. Core.
         Decide a qué modo de operación entrar (Diseño, Transición o Charla).
         """
         estado = datos.get("estado_conversacion", {"modo": "libre"})
-        comando = datos.get("comando", "")
+                comando = datos.get("comando", "")
         comando_lower = comando.lower()
 
         # --- SALUDO INICIAL ---
@@ -444,14 +444,14 @@ class Guardian:
 
         # --- PALABRAS CLAVE PARA ACTIVAR MODOS ---
         palabras_clave_diseno = ["diseñar", "contrato", "forjar", "crear", "ruleta", "modo diseño"]
-        palabras_clave_transicion = ["transicion", "bache", "preparar", "plan", "agendar", "negociar"]
+        palabras_clave_transicion = ["transicion", "bache", "preparar", "plan", "agendar", "negociar", "hueco", "espacio"]
         
         # --- LÓGICA DE ENTRADA A MODOS (CORREGIDA CON PRIORIDAD) ---
         
         # Prioridad 1: Modo Transición. Es más específico.
         if any(palabra in comando_lower for palabra in palabras_clave_transicion) and estado.get("modo") != "transicion":
             nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_ACTIVIDAD_MADRE", "datos_bache": {}}
-            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Transición activado. ¿Cuál es la actividad principal que harás después?"}
+            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Transición activado. ¿Cuál es la actividad principal para la que nos preparamos?"}
 
         # Prioridad 2: Modo Diseño.
         if any(palabra in comando_lower for palabra in palabras_clave_diseno) and estado.get("modo") != "diseño":
@@ -468,3 +468,4 @@ class Guardian:
         # --- MODO CHARLA POR DEFECTO ---
         respuesta_conversacional = await self._gestionar_charla_ia(comando)
         return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": respuesta_conversacional}
+
