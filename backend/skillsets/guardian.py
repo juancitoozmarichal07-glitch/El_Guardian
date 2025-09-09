@@ -1,10 +1,9 @@
 # =================================================================
-# GUARDIAN.PY (v3.8 - El Guardián con Memoria)
+# GUARDIAN.PY (v4.0 - El Editor por Categorías)
 # =================================================================
-# Esta versión corrige el bug de "amnesia" en el Modo Diseño.
-# Ahora, al usar la ruleta en una corrección, el Guardián recuerda
-# su contexto y vuelve a presentar el borrador actualizado sin
-# reiniciar el flujo de creación.
+# Esta es la versión más avanzada. Introduce un ciclo de corrección
+# por categorías (Tareas / Duraciones) en el Modo Transición,
+# permitiendo una edición por lotes antes de confirmar el plan.
 
 import g4f
 import re
@@ -17,9 +16,9 @@ class Guardian:
         """
         Inicializa el especialista Guardian.
         """
-        print(f"    - Especialista 'Guardian' v3.8 (Guardián con Memoria) listo.")
+        print(f"    - Especialista 'Guardian' v4.0 (Editor por Categorías) listo.")
 
-    # --- FUNCIONES AUXILIARES (Sin cambios) ---
+    # --- FUNCIONES AUXILIARES ---
     def _extraer_duracion_de_tarea(self, texto_tarea):
         match = re.search(r'\((\d+)\s*min\s*\)', texto_tarea)
         if match: return int(match.group(1))
@@ -70,12 +69,13 @@ class Guardian:
         partes = [p.strip() for p in comando_usuario.split(',') if p.strip()]
         for parte in partes:
             duracion = self._extraer_duracion_de_tarea(parte)
+            tarea_nombre = re.sub(r'\s*\(\d+\s*min\s*\)', '', parte).strip()
+            tarea_nombre = re.sub(r'\s*\(\d+\)', '', tarea_nombre).strip()
             if duracion > 0:
-                tarea_nombre = re.sub(r'\s*\(\d+\s*min\s*\)', '', parte).strip()
                 tareas_con_duracion.append(f"{tarea_nombre} ({duracion} min)")
                 tiempo_comprometido += duracion
             else:
-                tareas_sin_duracion.append(parte)
+                tareas_sin_duracion.append(tarea_nombre)
         bache_para_flexibles = bache_utilizable - tiempo_comprometido
         plan_flexible = self._crear_plan_de_transicion(tareas_sin_duracion, bache_para_flexibles)
         plan_final = tareas_con_duracion + plan_flexible
@@ -119,7 +119,6 @@ class Guardian:
         paso = estado_actual.get("paso_diseno")
         datos_plan = estado_actual.get("datos_plan", {})
         
-        # --- Flujo Principal de Creación ---
         if paso == "ESPERANDO_MISION":
             opciones = [opt.strip() for opt in comando.split(',') if opt.strip()]
             if not opciones: return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Define la misión."}
@@ -220,7 +219,6 @@ class Guardian:
             datos_plan["duracion"] = comando
             return self._presentar_borrador_contrato(datos_plan)
 
-        # --- Flujo de Corrección Universal ---
         elif paso == "ESPERANDO_CONFIRMACION_CONTRATO":
             if "confirmar" in comando.lower():
                 return self._forjar_contrato(datos_plan)
@@ -270,7 +268,26 @@ class Guardian:
             
         return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo de diseño. Reiniciando."}
 
-    # --- MODO TRANSICIÓN (Sin cambios) ---
+# (CONTINÚA EN LA PARTE 2)
+# (VIENE DE LA PARTE 1)
+
+    # --- MODO TRANSICIÓN (v4.0 - CON CICLO DE CORRECCIÓN) ---
+    def _presentar_borrador_transicion(self, datos_bache):
+        plan_borrador = datos_bache.get("plan_borrador", [])
+        if not plan_borrador:
+            return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error: No hay plan que mostrar."}
+        
+        plan_texto_lista = []
+        for i, tarea in enumerate(plan_borrador):
+            plan_texto_lista.append(f"{i+1}. {tarea}")
+        plan_texto = "\n".join(plan_texto_lista)
+
+        mensaje = (f"He generado el siguiente plan borrador:\n\n{plan_texto}\n\n"
+                   f"**¿Confirmas este plan o quieres corregir algo?** (confirmar/corregir)")
+        
+        nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_CONFIRMACION_PLAN", "datos_bache": datos_bache}
+        return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": mensaje}
+
     def _gestionar_transicion(self, estado_actual, comando):
         paso = estado_actual.get("paso_transicion")
         datos_bache = estado_actual.get("datos_bache", {})
@@ -305,60 +322,103 @@ class Guardian:
                 return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Ocurrió un error inesperado."}
 
         elif paso == "ESPERANDO_TAREAS_OBJETIVO":
-            tareas_objetivo = [tarea.strip() for tarea in comando.split(',') if tarea.strip()]
-            if not tareas_objetivo:
-                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Necesito al menos una tarea objetivo."}
             bache_utilizable = datos_bache.get("bache_utilizable_minutos", 0)
-            plan_generado = self._crear_plan_de_transicion(tareas_objetivo, bache_utilizable)
+            plan_generado = self._procesar_plan_mixto(comando, bache_utilizable)
             if not plan_generado:
                 return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "No se pudo generar un plan viable con el tiempo disponible."}
             datos_bache["plan_borrador"] = plan_generado
-            plan_texto = "\n".join([f"- {tarea}" for tarea in plan_generado])
-            mensaje = (f"He generado el siguiente plan borrador:\n\n{plan_texto}\n\n"
-                       f"**¿Aceptas este plan o quieres modificarlo?** (aceptar/modificar)")
-            nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_CONFIRMACION_PLAN", "datos_bache": datos_bache}
-            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": mensaje}
+            return self._presentar_borrador_transicion(datos_bache)
 
         elif paso == "ESPERANDO_CONFIRMACION_PLAN":
-            plan_final = []
-            if "aceptar" in comando.lower():
+            if "confirmar" in comando.lower():
                 plan_final = datos_bache.get("plan_borrador", [])
-            elif "modificar" in comando.lower():
-                nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_PLAN_MODIFICADO", "datos_bache": datos_bache}
-                mensaje = ("Entendido. Define tu plan. Para duraciones específicas, usa paréntesis.\n"
-                           "*Ej: Leer (15 min), Jugar, Agradecer (5 min)*")
+                itinerario_agendado, total_descansos = self._calendarizar_plan(plan_final, zona_horaria_usuario)
+                plan_texto = "\n".join([f"**-** {linea}" for linea in itinerario_agendado])
+                tiempo_total_planificado = sum(self._extraer_duracion_de_tarea(t) for t in plan_final)
+                tiempo_total_usado = tiempo_total_planificado + total_descansos
+                tiempo_libre_restante = datos_bache.get("bache_utilizable_minutos", 0) - tiempo_total_usado
+                mensaje_final = (f"**PLAN DE TRANSICIÓN AGENDADO**\n--------------------\n"
+                                 f"Itinerario para tu bache:\n\n{plan_texto}\n\n"
+                                 f"**Tiempo planificado:** {tiempo_total_planificado} min.\n"
+                                 f"**Tiempo libre no asignado:** {tiempo_libre_restante} min.\n--------------------\n"
+                                 f"¡Itinerario sellado!")
+                return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": mensaje_final}
+            elif "corregir" in comando.lower():
+                nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_CATEGORIA_CORRECCION", "datos_bache": datos_bache}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Entendido. ¿Qué categoría quieres corregir? **(Tareas / Duraciones)**"}
+            else:
+                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "No te he entendido. Responde 'confirmar' o 'corregir'."}
+
+        elif paso == "ESPERANDO_CATEGORIA_CORRECCION":
+            if "tareas" in comando.lower():
+                nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_CORRECCION_TAREAS", "datos_bache": datos_bache}
+                plan_actual_texto = "\n".join([f"{i+1}. {t}" for i, t in enumerate(datos_bache.get("plan_borrador", []))])
+                mensaje = f"De acuerdo. Este es el plan actual:\n\n{plan_actual_texto}\n\nDime el número de la tarea a cambiar y el nuevo nombre.\n*Ej: 1 Jugar, 3 Dibujar*"
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": mensaje}
+            elif "duraciones" in comando.lower():
+                nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_CORRECCION_DURACIONES", "datos_bache": datos_bache}
+                plan_actual_texto = "\n".join([f"{i+1}. {t}" for i, t in enumerate(datos_bache.get("plan_borrador", []))])
+                mensaje = f"De acuerdo. Este es el plan actual:\n\n{plan_actual_texto}\n\nDime el número de la tarea y la nueva duración. Si no pones duración, la elegiré yo.\n*Ej: 1: 25, 3, 4 (35)*"
                 return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": mensaje}
             else:
-                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "No te he entendido. Responde 'aceptar' o 'modificar'."}
-            
-            itinerario_agendado, total_descansos = self._calendarizar_plan(plan_final, zona_horaria_usuario)
-            plan_texto = "\n".join([f"**-** {linea}" for linea in itinerario_agendado])
-            tiempo_total_planificado = sum(self._extraer_duracion_de_tarea(t) for t in plan_final)
-            tiempo_total_usado = tiempo_total_planificado + total_descansos
-            tiempo_libre_restante = datos_bache.get("bache_utilizable_minutos", 0) - tiempo_total_usado
-            mensaje_final = (f"**PLAN DE TRANSICIÓN AGENDADO**\n--------------------\n"
-                             f"Itinerario para tu bache:\n\n{plan_texto}\n\n"
-                             f"**Tiempo planificado:** {tiempo_total_planificado} min.\n"
-                             f"**Tiempo libre no asignado:** {tiempo_libre_restante} min.\n--------------------\n"
-                             f"¡Itinerario sellado!")
-            return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": mensaje_final}
+                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Categoría no válida. Elige 'Tareas' o 'Duraciones'."}
 
-        elif paso == "ESPERANDO_PLAN_MODIFICADO":
+        elif paso == "ESPERANDO_CORRECCION_TAREAS":
+            plan_actual = datos_bache.get("plan_borrador", [])
+            cambios = [c.strip() for c in comando.split(',') if c.strip()]
+            for cambio in cambios:
+                match = re.match(r'(\d+)\s*(?::\s*|\s+)(.+)', cambio)
+                if match:
+                    idx = int(match.group(1)) - 1
+                    nuevo_nombre = match.group(2).strip()
+                    if 0 <= idx < len(plan_actual):
+                        duracion_actual = self._extraer_duracion_de_tarea(plan_actual[idx])
+                        plan_actual[idx] = f"{nuevo_nombre} ({duracion_actual} min)"
+            datos_bache["plan_borrador"] = plan_actual
+            return self._presentar_borrador_transicion(datos_bache)
+
+        elif paso == "ESPERANDO_CORRECCION_DURACIONES":
+            plan_actual = list(datos_bache.get("plan_borrador", []))
             bache_utilizable = datos_bache.get("bache_utilizable_minutos", 0)
-            plan_final = self._procesar_plan_mixto(comando, bache_utilizable)
-            if not plan_final:
-                 return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "No se pudo generar un plan viable con esas tareas."}
-            itinerario_agendado, total_descansos = self._calendarizar_plan(plan_final, zona_horaria_usuario)
-            plan_texto = "\n".join([f"**-** {linea}" for linea in itinerario_agendado])
-            tiempo_total_planificado = sum(self._extraer_duracion_de_tarea(t) for t in plan_final)
-            tiempo_total_usado = tiempo_total_planificado + total_descansos
-            tiempo_libre_restante = bache_utilizable - tiempo_total_usado
-            mensaje_final = (f"**PLAN DE TRANSICIÓN AGENDADO**\n--------------------\n"
-                             f"Itinerario basado en tu plan manual:\n\n{plan_texto}\n\n"
-                             f"**Tiempo planificado:** {tiempo_total_planificado} min.\n"
-                             f"**Tiempo libre no asignado:** {tiempo_libre_restante} min.\n--------------------\n"
-                             f"¡Itinerario sellado!")
-            return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": mensaje_final}
+            
+            tareas_modificadas = list(plan_actual)
+            indices_para_reasignar = []
+
+            partes_comando = [p.strip() for p in comando.split(',') if p.strip()]
+
+            for parte in partes_comando:
+                match_con_valor = re.match(r'(\d+)\s*[:\s(]+(\d+)\)?', parte)
+                match_sin_valor = re.match(r'(\d+)\s*$', parte)
+                
+                idx = -1
+                if match_con_valor:
+                    idx = int(match_con_valor.group(1)) - 1
+                    nueva_duracion = int(match_con_valor.group(2))
+                    if 0 <= idx < len(tareas_modificadas):
+                        nombre_tarea = re.sub(r'\s*\(\d+.*\)', '', tareas_modificadas[idx]).strip()
+                        tareas_modificadas[idx] = f"{nombre_tarea} ({nueva_duracion} min)"
+                elif match_sin_valor:
+                    idx = int(match_sin_valor.group(1)) - 1
+                    if 0 <= idx < len(tareas_modificadas):
+                        indices_para_reasignar.append(idx)
+
+            tareas_fijas = []
+            tareas_flexibles_nombres = []
+            for i, tarea in enumerate(tareas_modificadas):
+                if i in indices_para_reasignar:
+                    nombre_tarea = re.sub(r'\s*\(\d+.*\)', '', tarea).strip()
+                    tareas_flexibles_nombres.append(nombre_tarea)
+                else:
+                    tareas_fijas.append(tarea)
+            
+            tiempo_comprometido = sum(self._extraer_duracion_de_tarea(t) for t in tareas_fijas)
+            bache_restante = bache_utilizable - tiempo_comprometido
+            
+            plan_flexible_nuevo = self._crear_plan_de_transicion(tareas_flexibles_nombres, bache_restante)
+            
+            plan_final = tareas_fijas + plan_flexible_nuevo
+            datos_bache["plan_borrador"] = plan_final
+            return self._presentar_borrador_transicion(datos_bache)
 
         return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo de transición. Reiniciando."}
 
@@ -379,22 +439,7 @@ class Guardian:
         if comando == "_SALUDO_INICIAL_":
             return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Guardián online. ¿Forjamos un Contrato o negociamos una Transición?"}
 
-        palabras_clave_diseno = ["diseñar", "contrato", "forjar", "crear", "ruleta", "modo diseño", "corregir"]
+        palabras_clave_diseno = ["diseñar", "contrato", "forjar", "crear", "ruleta", "modo diseño"]
         palabras_clave_transicion = ["transicion", "bache", "preparar", "plan", "agendar", "negociar"]
         
-        if any(palabra in comando.lower() for palabra in palabras_clave_transicion) and estado.get("modo") != "transicion":
-            nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_ACTIVIDAD_MADRE", "datos_bache": {}}
-            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Transición activado. ¿Cuál es la actividad principal para la que nos preparamos?"}
-        
-        if any(palabra in comando.lower() for palabra in palabras_clave_diseno) and estado.get("modo") != "diseño":
-            nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_MISION", "datos_plan": {}}
-            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Diseño activado. Define la misión."}
-
-        if estado.get("modo") == "diseño":
-            return self._gestionar_diseno(estado, comando)
-        
-        if estado.get("modo") == "transicion":
-            return self._gestionar_transicion(estado, comando)
-
-        respuesta_conversacional = await self._gestionar_charla_ia(comando)
-        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": respuesta_conversacional}
+        if any(palabra
