@@ -267,8 +267,7 @@ class Guardian:
                     return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en la corrección con ruleta. Reiniciando."}
             
         return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo de diseño. Reiniciando."}
-
-    # --- MODO TRANSICIÓN (v4.0 - CON CICLO DE CORRECCIÓN) ---
+            # --- MODO TRANSICIÓN (v4.0 - CON CICLO DE CORRECCIÓN) ---
     def _presentar_borrador_transicion(self, datos_bache):
         plan_borrador = datos_bache.get("plan_borrador", [])
         if not plan_borrador:
@@ -435,7 +434,7 @@ class Guardian:
         Decide a qué modo de operación entrar (Diseño, Transición o Charla).
         """
         estado = datos.get("estado_conversacion", {"modo": "libre"})
-                comando = datos.get("comando", "")
+        comando = datos.get("comando", "")
         comando_lower = comando.lower()
 
         # --- SALUDO INICIAL ---
