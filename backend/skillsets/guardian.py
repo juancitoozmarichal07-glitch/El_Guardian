@@ -1,13 +1,9 @@
 # =================================================================
-# GUARDIAN.PY (v5.0 - El Archivista de Contratos)
+# GUARDIAN.PY (v5.1 - El Archivista con Estilo)
 # =================================================================
-# Mejoras Mayores:
-# 1. ARCHIVO DE CONTRATOS: El Guardián ahora guarda cada contrato
-#    forjado en un archivo interno.
-# 2. CÓDIGOS ÚNICOS: Cada contrato recibe un código único (ej. CLDS-XX)
-#    y la fecha completa de sellado.
-# 3. BÚSQUEDA DE CONTRATOS: Se puede recuperar un contrato completo
-#    usando su código único.
+# Mejoras:
+# 1. Se refina el formato de presentación de los contratos forjados
+#    y recuperados para mayor claridad y elegancia.
 
 import g4f
 import re
@@ -20,15 +16,13 @@ class Guardian:
     def __init__(self):
         """
         Inicializa el especialista Guardian.
-        ¡NUEVO! Ahora tiene un archivo para guardar contratos.
         """
         self.archivo_contratos = {}
         self.contador_contratos = 1
-        print(f"    - Especialista 'Guardian' v5.0 (El Archivista) listo.")
+        print(f"    - Especialista 'Guardian' v5.1 (Archivista con Estilo) listo.")
 
     # --- FUNCIONES AUXILIARES ---
     def _generar_codigo_contrato(self):
-        """NUEVA FUNCIÓN: Genera un código único para cada contrato."""
         codigo = f"CLDS-{self.contador_contratos:03d}"
         self.contador_contratos += 1
         return codigo
@@ -124,7 +118,7 @@ class Guardian:
 
     def _forjar_contrato(self, datos_plan):
         """
-        FUNCIÓN MEJORADA: Genera código, fecha completa y guarda en el archivo.
+        FUNCIÓN MEJORADA: Formato de presentación refinado.
         """
         zona_horaria_usuario = pytz.timezone("America/Montevideo")
         ahora = datetime.now(zona_horaria_usuario)
@@ -133,7 +127,6 @@ class Guardian:
         datos_plan['fecha_sellado'] = ahora.strftime("%d/%m/%y")
         datos_plan['hora_sellado'] = ahora.strftime("%H:%M")
         
-        # Guardar el contrato completo en el archivo
         self.archivo_contratos[datos_plan['codigo']] = datos_plan
         
         mision_base = datos_plan.get('mision', 'N/A')
@@ -141,18 +134,21 @@ class Guardian:
         mision_completa = f"{mision_base} -> {' -> '.join(especificaciones)}" if especificaciones else mision_base
         
         contrato_texto = (
-            f"**CONTRATO FORJADO ({datos_plan['codigo']})**\n--------------------\n"
+            f"**CONTRATO FORJADO**\n--------------------\n"
             f"**Misión:** {mision_completa}\n"
             f"**Arranque:** {datos_plan.get('arranque', 'N/A')}\n"
             f"**Duración:** {datos_plan.get('duracion', 'N/A')}\n"
-            f"**Sellado:** {datos_plan['fecha_sellado']} a las {datos_plan['hora_sellado']}\n--------------------\n"
+            f"**Sellado:** {datos_plan['fecha_sellado']} a las {datos_plan['hora_sellado']}\n"
+            f"**Identificador del contrato:** {datos_plan['codigo']}\n--------------------\n"
             f"Contrato archivado. ¿Siguiente misión?"
         )
         nuevo_estado = {"modo": "libre"}
         return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": contrato_texto}
 
     def _buscar_contrato_por_codigo(self, codigo):
-        """NUEVA FUNCIÓN: Busca un contrato en el archivo y lo presenta."""
+        """
+        FUNCIÓN MEJORADA: Formato de presentación refinado.
+        """
         codigo = codigo.upper()
         contrato_guardado = self.archivo_contratos.get(codigo)
         
@@ -164,11 +160,12 @@ class Guardian:
         mision_completa = f"{mision_base} -> {' -> '.join(especificaciones)}" if especificaciones else mision_base
         
         texto_contrato_recuperado = (
-            f"**CONTRATO RECUPERADO ({codigo})**\n--------------------\n"
+            f"**CONTRATO RECUPERADO**\n--------------------\n"
             f"**Misión:** {mision_completa}\n"
             f"**Arranque:** {contrato_guardado.get('arranque', 'N/A')}\n"
             f"**Duración:** {contrato_guardado.get('duracion', 'N/A')}\n"
-            f"**Sellado:** {contrato_guardado.get('fecha_sellado')} a las {contrato_guardado.get('hora_sellado')}\n--------------------"
+            f"**Sellado:** {contrato_guardado.get('fecha_sellado')} a las {contrato_guardado.get('hora_sellado')}\n"
+            f"**Identificador del contrato:** {contrato_guardado.get('codigo')}\n--------------------"
         )
         return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": texto_contrato_recuperado}
 
@@ -291,7 +288,7 @@ class Guardian:
                     datos_plan[campo_en_edicion] = comando
                 return self._presentar_borrador_contrato(datos_plan)
             
-            else: # Si hay comas, asumimos que es para la ruleta
+            else:
                 mapa_pasos = {
                     "misión": "ESPERANDO_RESULTADO_MISION",
                     "arranque": "ESPERANDO_RESULTADO_ARRANQUE",
@@ -301,7 +298,7 @@ class Guardian:
                 if paso_siguiente:
                     estado_actual["paso_diseno"] = paso_siguiente
                     return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
-                else: # Fallback por si algo sale mal
+                else:
                     return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en la corrección con ruleta. Reiniciando."}
             
         return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo de diseño. Reiniciando."}
@@ -471,7 +468,7 @@ class Guardian:
         if comando == "_SALUDO_INICIAL_":
             return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Guardián online. ¿Forjamos un Contrato o negociamos una Transición?"}
 
-        # --- LÓGICA DE BÚSQUEDA DE CONTRATOS (¡NUEVO!) ---
+        # --- LÓGICA DE BÚSQUEDA DE CONTRATOS ---
         match_busqueda = re.search(r'(?:contrato|buscar|traer)\s+(CLDS-\d+)', comando, re.IGNORECASE)
         if match_busqueda:
             codigo_contrato = match_busqueda.group(1)
