@@ -1,24 +1,38 @@
 # =================================================================
-# GUARDIAN.PY (v4.2 - Lógica de Ruleta Restaurada)
+# GUARDIAN.PY (v5.0 - El Archivista de Contratos)
 # =================================================================
-# Mejoras:
-# 1. Se restaura el comportamiento de la ruleta en el Modo Diseño
-#    cuando el usuario introduce múltiples opciones separadas por comas.
+# Mejoras Mayores:
+# 1. ARCHIVO DE CONTRATOS: El Guardián ahora guarda cada contrato
+#    forjado en un archivo interno.
+# 2. CÓDIGOS ÚNICOS: Cada contrato recibe un código único (ej. CLDS-XX)
+#    y la fecha completa de sellado.
+# 3. BÚSQUEDA DE CONTRATOS: Se puede recuperar un contrato completo
+#    usando su código único.
 
 import g4f
 import re
 from datetime import datetime, timedelta
 import pytz
 import random
+import string
 
 class Guardian:
     def __init__(self):
         """
         Inicializa el especialista Guardian.
+        ¡NUEVO! Ahora tiene un archivo para guardar contratos.
         """
-        print(f"    - Especialista 'Guardian' v4.2 (Ruleta Restaurada) listo.")
+        self.archivo_contratos = {}
+        self.contador_contratos = 1
+        print(f"    - Especialista 'Guardian' v5.0 (El Archivista) listo.")
 
     # --- FUNCIONES AUXILIARES ---
+    def _generar_codigo_contrato(self):
+        """NUEVA FUNCIÓN: Genera un código único para cada contrato."""
+        codigo = f"CLDS-{self.contador_contratos:03d}"
+        self.contador_contratos += 1
+        return codigo
+
     def _extraer_duracion_de_tarea(self, texto_tarea):
         match = re.search(r'\((\d+)\s*min\s*\)', texto_tarea)
         if match: return int(match.group(1))
@@ -32,24 +46,19 @@ class Guardian:
 
     def _calendarizar_plan(self, plan_generado, zona_horaria):
         if not plan_generado: return [], 0
-        
         itinerario_final, minutos_descanso_totales = [], 0
         hora_actual = datetime.now(zona_horaria)
-
         respiro_inicial_minutos = random.randint(5, 10)
         hora_despues_respiro = hora_actual + timedelta(minutes=respiro_inicial_minutos)
         proxima_hora_inicio = self._redondear_hora_al_proximo_intervalo_de_5_min(hora_despues_respiro)
         respiro_real_total = (proxima_hora_inicio - hora_actual).total_seconds() / 60
         itinerario_final.append(f"*(Respiro inicial de {int(respiro_real_total)} minutos)*")
-
         for i, tarea_texto in enumerate(plan_generado):
             duracion_minutos = self._extraer_duracion_de_tarea(tarea_texto)
             if duracion_minutos == 0: continue
-            
             hora_fin = proxima_hora_inicio + timedelta(minutes=duracion_minutos)
             texto_itinerario = f"{proxima_hora_inicio.strftime('%H:%M')} - {hora_fin.strftime('%H:%M')}: {tarea_texto}"
             itinerario_final.append(texto_itinerario)
-            
             if i < len(plan_generado) - 1:
                 descanso_minutos = random.randint(5, 10)
                 hora_despues_descanso = hora_fin + timedelta(minutes=descanso_minutos)
@@ -58,9 +67,6 @@ class Guardian:
                 minutos_descanso_totales += descanso_real_total
                 itinerario_final.append(f"*(Descanso de {int(descanso_real_total)} minutos)*")
                 proxima_hora_inicio = proxima_hora_siguiente
-            else:
-                proxima_hora_inicio = hora_fin
-
         return itinerario_final, minutos_descanso_totales
 
     def _crear_plan_de_transicion(self, tareas, bache_utilizable):
@@ -117,22 +123,54 @@ class Guardian:
         return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": contrato_borrador_texto}
 
     def _forjar_contrato(self, datos_plan):
+        """
+        FUNCIÓN MEJORADA: Genera código, fecha completa y guarda en el archivo.
+        """
         zona_horaria_usuario = pytz.timezone("America/Montevideo")
         ahora = datetime.now(zona_horaria_usuario)
-        hora_sellado = ahora.strftime("%H:%M")
+        
+        datos_plan['codigo'] = self._generar_codigo_contrato()
+        datos_plan['fecha_sellado'] = ahora.strftime("%d/%m/%y")
+        datos_plan['hora_sellado'] = ahora.strftime("%H:%M")
+        
+        # Guardar el contrato completo en el archivo
+        self.archivo_contratos[datos_plan['codigo']] = datos_plan
+        
         mision_base = datos_plan.get('mision', 'N/A')
         especificaciones = datos_plan.get('especificaciones', [])
         mision_completa = f"{mision_base} -> {' -> '.join(especificaciones)}" if especificaciones else mision_base
+        
         contrato_texto = (
-            f"**CONTRATO FORJADO**\n--------------------\n"
+            f"**CONTRATO FORJADO ({datos_plan['codigo']})**\n--------------------\n"
             f"**Misión:** {mision_completa}\n"
             f"**Arranque:** {datos_plan.get('arranque', 'N/A')}\n"
             f"**Duración:** {datos_plan.get('duracion', 'N/A')}\n"
-            f"**Sellado a las:** {hora_sellado}\n--------------------\n"
-            f"Contrato sellado. ¿Siguiente misión?"
+            f"**Sellado:** {datos_plan['fecha_sellado']} a las {datos_plan['hora_sellado']}\n--------------------\n"
+            f"Contrato archivado. ¿Siguiente misión?"
         )
         nuevo_estado = {"modo": "libre"}
         return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": contrato_texto}
+
+    def _buscar_contrato_por_codigo(self, codigo):
+        """NUEVA FUNCIÓN: Busca un contrato en el archivo y lo presenta."""
+        codigo = codigo.upper()
+        contrato_guardado = self.archivo_contratos.get(codigo)
+        
+        if not contrato_guardado:
+            return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": f"No encontré ningún contrato con el código '{codigo}' en mis archivos."}
+            
+        mision_base = contrato_guardado.get('mision', 'N/A')
+        especificaciones = contrato_guardado.get('especificaciones', [])
+        mision_completa = f"{mision_base} -> {' -> '.join(especificaciones)}" if especificaciones else mision_base
+        
+        texto_contrato_recuperado = (
+            f"**CONTRATO RECUPERADO ({codigo})**\n--------------------\n"
+            f"**Misión:** {mision_completa}\n"
+            f"**Arranque:** {contrato_guardado.get('arranque', 'N/A')}\n"
+            f"**Duración:** {contrato_guardado.get('duracion', 'N/A')}\n"
+            f"**Sellado:** {contrato_guardado.get('fecha_sellado')} a las {contrato_guardado.get('hora_sellado')}\n--------------------"
+        )
+        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": texto_contrato_recuperado}
 
     def _gestionar_diseno(self, estado_actual, comando):
         paso = estado_actual.get("paso_diseno")
@@ -150,12 +188,6 @@ class Guardian:
                 return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
         
         elif paso == "ESPERANDO_RESULTADO_MISION":
-            if datos_plan.get("corrigiendo_con_ruleta"):
-                datos_plan.pop("corrigiendo_con_ruleta", None)
-                datos_plan.pop("campo_en_edicion", None)
-                datos_plan["mision"] = comando
-                return self._presentar_borrador_contrato(datos_plan)
-            
             datos_plan["mision"] = comando
             nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ESPECIFICACION", "datos_plan": datos_plan}
             return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Misión elegida: **{comando}**. ¿Necesitas especificar más? (sí/no)"}
@@ -200,12 +232,6 @@ class Guardian:
                 return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
                 
         elif paso == "ESPERANDO_RESULTADO_ARRANQUE":
-            if datos_plan.get("corrigiendo_con_ruleta"):
-                datos_plan.pop("corrigiendo_con_ruleta", None)
-                datos_plan.pop("campo_en_edicion", None)
-                datos_plan["arranque"] = comando
-                return self._presentar_borrador_contrato(datos_plan)
-
             datos_plan["arranque"] = comando
             nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_DECISION_DURACION", "datos_plan": datos_plan}
             return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Arranque: **{comando}**. ¿Necesitas definir una duración? (sí/no)"}
@@ -229,12 +255,6 @@ class Guardian:
                 return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
                 
         elif paso == "ESPERANDO_RESULTADO_DURACION":
-            if datos_plan.get("corrigiendo_con_ruleta"):
-                datos_plan.pop("corrigiendo_con_ruleta", None)
-                datos_plan.pop("campo_en_edicion", None)
-                datos_plan["duracion"] = comando
-                return self._presentar_borrador_contrato(datos_plan)
-
             datos_plan["duracion"] = comando
             return self._presentar_borrador_contrato(datos_plan)
 
@@ -271,7 +291,7 @@ class Guardian:
                     datos_plan[campo_en_edicion] = comando
                 return self._presentar_borrador_contrato(datos_plan)
             
-            else:
+            else: # Si hay comas, asumimos que es para la ruleta
                 mapa_pasos = {
                     "misión": "ESPERANDO_RESULTADO_MISION",
                     "arranque": "ESPERANDO_RESULTADO_ARRANQUE",
@@ -279,10 +299,9 @@ class Guardian:
                 }
                 paso_siguiente = mapa_pasos.get(campo_en_edicion)
                 if paso_siguiente:
-                    datos_plan["corrigiendo_con_ruleta"] = True
                     estado_actual["paso_diseno"] = paso_siguiente
                     return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
-                else:
+                else: # Fallback por si algo sale mal
                     return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en la corrección con ruleta. Reiniciando."}
             
         return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo de diseño. Reiniciando."}
@@ -395,16 +414,12 @@ class Guardian:
         elif paso == "ESPERANDO_CORRECCION_DURACIONES":
             plan_actual = list(datos_bache.get("plan_borrador", []))
             bache_utilizable = datos_bache.get("bache_utilizable_minutos", 0)
-            
             tareas_modificadas = list(plan_actual)
             indices_para_reasignar = []
-
             partes_comando = [p.strip() for p in comando.split(',') if p.strip()]
-
             for parte in partes_comando:
                 match_con_valor = re.match(r'(\d+)\s*[:\s(]+(\d+)\)?', parte)
                 match_sin_valor = re.match(r'(\d+)\s*$', parte)
-                
                 idx = -1
                 if match_con_valor:
                     idx = int(match_con_valor.group(1)) - 1
@@ -416,7 +431,6 @@ class Guardian:
                     idx = int(match_sin_valor.group(1)) - 1
                     if 0 <= idx < len(tareas_modificadas):
                         indices_para_reasignar.append(idx)
-
             tareas_fijas = []
             tareas_flexibles_nombres = []
             for i, tarea in enumerate(tareas_modificadas):
@@ -425,12 +439,9 @@ class Guardian:
                     tareas_flexibles_nombres.append(nombre_tarea)
                 else:
                     tareas_fijas.append(tarea)
-            
             tiempo_comprometido = sum(self._extraer_duracion_de_tarea(t) for t in tareas_fijas)
             bache_restante = bache_utilizable - tiempo_comprometido
-            
             plan_flexible_nuevo = self._crear_plan_de_transicion(tareas_flexibles_nombres, bache_restante)
-            
             plan_final = tareas_fijas + plan_flexible_nuevo
             datos_bache["plan_borrador"] = plan_final
             return self._presentar_borrador_transicion(datos_bache)
@@ -460,18 +471,21 @@ class Guardian:
         if comando == "_SALUDO_INICIAL_":
             return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Guardián online. ¿Forjamos un Contrato o negociamos una Transición?"}
 
+        # --- LÓGICA DE BÚSQUEDA DE CONTRATOS (¡NUEVO!) ---
+        match_busqueda = re.search(r'(?:contrato|buscar|traer)\s+(CLDS-\d+)', comando, re.IGNORECASE)
+        if match_busqueda:
+            codigo_contrato = match_busqueda.group(1)
+            return self._buscar_contrato_por_codigo(codigo_contrato)
+
         # --- PALABRAS CLAVE PARA ACTIVAR MODOS ---
         palabras_clave_diseno = ["diseñar", "contrato", "forjar", "crear", "ruleta", "modo diseño"]
         palabras_clave_transicion = ["transicion", "bache", "preparar", "plan", "agendar", "negociar", "hueco", "espacio"]
         
-        # --- LÓGICA DE ENTRADA A MODOS (CORREGIDA CON PRIORIDAD) ---
-        
-        # Prioridad 1: Modo Transición. Es más específico.
+        # --- LÓGICA DE ENTRADA A MODOS (CON PRIORIDAD) ---
         if any(palabra in comando_lower for palabra in palabras_clave_transicion) and estado.get("modo") != "transicion":
             nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_ACTIVIDAD_MADRE", "datos_bache": {}}
             return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Transición activado. ¿Cuál es la actividad principal para la que nos preparamos?"}
 
-        # Prioridad 2: Modo Diseño.
         if any(palabra in comando_lower for palabra in palabras_clave_diseno) and estado.get("modo") != "diseño":
             nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_MISION", "datos_plan": {}}
             return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Diseño activado. Define la misión."}
