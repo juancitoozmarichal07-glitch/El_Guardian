@@ -268,9 +268,6 @@ class Guardian:
             
         return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo de diseño. Reiniciando."}
 
-# (CONTINÚA EN LA PARTE 2)
-# (VIENE DE LA PARTE 1)
-
     # --- MODO TRANSICIÓN (v4.0 - CON CICLO DE CORRECCIÓN) ---
     def _presentar_borrador_transicion(self, datos_bache):
         plan_borrador = datos_bache.get("plan_borrador", [])
@@ -433,13 +430,38 @@ class Guardian:
             return "Mi núcleo cognitivo tuvo una sobrecarga. Inténtalo de nuevo."
 
     async def ejecutar(self, datos):
+        """
+        El punto de entrada que es llamado por A.L.E. Core.
+        Decide a qué modo de operación entrar (Diseño, Transición o Charla).
+        """
         estado = datos.get("estado_conversacion", {"modo": "libre"})
         comando = datos.get("comando", "")
 
+        # --- SALUDO INICIAL ---
         if comando == "_SALUDO_INICIAL_":
             return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Guardián online. ¿Forjamos un Contrato o negociamos una Transición?"}
 
+        # --- PALABRAS CLAVE PARA ACTIVAR MODOS ---
         palabras_clave_diseno = ["diseñar", "contrato", "forjar", "crear", "ruleta", "modo diseño"]
         palabras_clave_transicion = ["transicion", "bache", "preparar", "plan", "agendar", "negociar"]
         
-        if any(palabra
+        # --- LÓGICA DE ENTRADA A MODOS ---
+        if any(palabra in comando.lower() for palabra in palabras_clave_diseno) and estado.get("modo") != "diseño":
+            nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_MISION", "datos_plan": {}}
+            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Diseño activado. Define la misión."}
+
+        if any(palabra in comando.lower() for palabra in palabras_clave_transicion) and estado.get("modo") != "transicion":
+            nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_ACTIVIDAD_MADRE", "datos_bache": {}}
+            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Transición activado. ¿Cuál es la actividad principal que harás después?"}
+
+        # --- GESTIÓN DE MODOS ACTIVOS ---
+        if estado.get("modo") == "diseño":
+            return self._gestionar_diseno(estado, comando)
+        
+        if estado.get("modo") == "transicion":
+            return self._gestionar_transicion(estado, comando)
+
+        # --- MODO CHARLA POR DEFECTO ---
+        respuesta_conversacional = await self._gestionar_charla_ia(comando)
+        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": respuesta_conversacional}
+
