@@ -1,9 +1,12 @@
 # =================================================================
-# GUARDIAN.PY (v5.1 - El Archivista con Estilo)
+# GUARDIAN.PY (v7.0 - El Identificador Universal)
 # =================================================================
-# Mejoras:
-# 1. Se refina el formato de presentación de los contratos forjados
-#    y recuperados para mayor claridad y elegancia.
+# Mejoras Mayores:
+# 1. IDENTIFICADOR ALEATORIO: Se reemplaza el contador secuencial por
+#    un generador de códigos alfanuméricos aleatorios (ej. PLAN-X8Y2).
+# 2. IDENTIFICADORES PARA TODOS: Ahora, tanto los Contratos Forjados
+#    como los Planes de Transición (baches) reciben su propio
+#    identificador único.
 
 import g4f
 import re
@@ -11,21 +14,25 @@ from datetime import datetime, timedelta
 import pytz
 import random
 import string
+import json
+import os
 
 class Guardian:
     def __init__(self):
         """
         Inicializa el especialista Guardian.
         """
-        self.archivo_contratos = {}
-        self.contador_contratos = 1
-        print(f"    - Especialista 'Guardian' v5.1 (Archivista con Estilo) listo.")
+        # Ya no necesitamos el archivo de persistencia para esta versión.
+        print(f"    - Especialista 'Guardian' v7.0 (Identificador Universal) listo.")
 
     # --- FUNCIONES AUXILIARES ---
-    def _generar_codigo_contrato(self):
-        codigo = f"CLDS-{self.contador_contratos:03d}"
-        self.contador_contratos += 1
-        return codigo
+    def _generar_codigo_plan(self):
+        """
+        NUEVA FUNCIÓN MEJORADA: Genera un código alfanumérico aleatorio de 4 caracteres.
+        """
+        caracteres = string.ascii_uppercase + string.digits
+        codigo_aleatorio = ''.join(random.choices(caracteres, k=4))
+        return f"PLAN-{codigo_aleatorio}"
 
     def _extraer_duracion_de_tarea(self, texto_tarea):
         match = re.search(r'\((\d+)\s*min\s*\)', texto_tarea)
@@ -118,16 +125,14 @@ class Guardian:
 
     def _forjar_contrato(self, datos_plan):
         """
-        FUNCIÓN MEJORADA: Formato de presentación refinado.
+        FUNCIÓN MEJORADA: Usa el nuevo generador de códigos aleatorios.
         """
         zona_horaria_usuario = pytz.timezone("America/Montevideo")
         ahora = datetime.now(zona_horaria_usuario)
         
-        datos_plan['codigo'] = self._generar_codigo_contrato()
+        datos_plan['codigo'] = self._generar_codigo_plan()
         datos_plan['fecha_sellado'] = ahora.strftime("%d/%m/%y")
         datos_plan['hora_sellado'] = ahora.strftime("%H:%M")
-        
-        self.archivo_contratos[datos_plan['codigo']] = datos_plan
         
         mision_base = datos_plan.get('mision', 'N/A')
         especificaciones = datos_plan.get('especificaciones', [])
@@ -139,35 +144,11 @@ class Guardian:
             f"**Arranque:** {datos_plan.get('arranque', 'N/A')}\n"
             f"**Duración:** {datos_plan.get('duracion', 'N/A')}\n"
             f"**Sellado:** {datos_plan['fecha_sellado']} a las {datos_plan['hora_sellado']}\n"
-            f"**Identificador del contrato:** {datos_plan['codigo']}\n--------------------\n"
-            f"Contrato archivado. ¿Siguiente misión?"
+            f"**Identificador:** {datos_plan['codigo']}\n--------------------\n"
+            f"Contrato sellado. ¿Siguiente misión?"
         )
         nuevo_estado = {"modo": "libre"}
         return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": contrato_texto}
-
-    def _buscar_contrato_por_codigo(self, codigo):
-        """
-        FUNCIÓN MEJORADA: Formato de presentación refinado.
-        """
-        codigo = codigo.upper()
-        contrato_guardado = self.archivo_contratos.get(codigo)
-        
-        if not contrato_guardado:
-            return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": f"No encontré ningún contrato con el código '{codigo}' en mis archivos."}
-            
-        mision_base = contrato_guardado.get('mision', 'N/A')
-        especificaciones = contrato_guardado.get('especificaciones', [])
-        mision_completa = f"{mision_base} -> {' -> '.join(especificaciones)}" if especificaciones else mision_base
-        
-        texto_contrato_recuperado = (
-            f"**CONTRATO RECUPERADO**\n--------------------\n"
-            f"**Misión:** {mision_completa}\n"
-            f"**Arranque:** {contrato_guardado.get('arranque', 'N/A')}\n"
-            f"**Duración:** {contrato_guardado.get('duracion', 'N/A')}\n"
-            f"**Sellado:** {contrato_guardado.get('fecha_sellado')} a las {contrato_guardado.get('hora_sellado')}\n"
-            f"**Identificador del contrato:** {contrato_guardado.get('codigo')}\n--------------------"
-        )
-        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": texto_contrato_recuperado}
 
     def _gestionar_diseno(self, estado_actual, comando):
         paso = estado_actual.get("paso_diseno")
@@ -302,7 +283,7 @@ class Guardian:
                     return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en la corrección con ruleta. Reiniciando."}
             
         return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo de diseño. Reiniciando."}
-    # --- MODO TRANSICIÓN (v4.0 - CON CICLO DE CORRECCIÓN) ---
+    # --- MODO TRANSICIÓN (v7.0 - CON IDENTIFICADOR ALEATORIO) ---
     def _presentar_borrador_transicion(self, datos_bache):
         plan_borrador = datos_bache.get("plan_borrador", [])
         if not plan_borrador:
@@ -368,7 +349,12 @@ class Guardian:
                 tiempo_total_planificado = sum(self._extraer_duracion_de_tarea(t) for t in plan_final)
                 tiempo_total_usado = tiempo_total_planificado + total_descansos
                 tiempo_libre_restante = datos_bache.get("bache_utilizable_minutos", 0) - tiempo_total_usado
+                
+                # ¡NUEVO! Generar código aleatorio para el plan de transición
+                codigo_plan = self._generar_codigo_plan()
+
                 mensaje_final = (f"**PLAN DE TRANSICIÓN AGENDADO**\n--------------------\n"
+                                 f"**Identificador:** {codigo_plan}\n"
                                  f"Itinerario para tu bache:\n\n{plan_texto}\n\n"
                                  f"**Tiempo planificado:** {tiempo_total_planificado} min.\n"
                                  f"**Tiempo libre no asignado:** {int(tiempo_libre_restante)} min.\n--------------------\n"
@@ -467,12 +453,6 @@ class Guardian:
         # --- SALUDO INICIAL ---
         if comando == "_SALUDO_INICIAL_":
             return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Guardián online. ¿Forjamos un Contrato o negociamos una Transición?"}
-
-        # --- LÓGICA DE BÚSQUEDA DE CONTRATOS ---
-        match_busqueda = re.search(r'(?:contrato|buscar|traer)\s+(CLDS-\d+)', comando, re.IGNORECASE)
-        if match_busqueda:
-            codigo_contrato = match_busqueda.group(1)
-            return self._buscar_contrato_por_codigo(codigo_contrato)
 
         # --- PALABRAS CLAVE PARA ACTIVAR MODOS ---
         palabras_clave_diseno = ["diseñar", "contrato", "forjar", "crear", "ruleta", "modo diseño"]
