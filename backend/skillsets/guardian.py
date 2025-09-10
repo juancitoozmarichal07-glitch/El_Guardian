@@ -1,12 +1,13 @@
 # =================================================================
-# GUARDIAN.PY (v7.0 - El Identificador Universal)
+# GUARDIAN.PY (v9.0 - El Planificador de Precisión)
 # =================================================================
 # Mejoras Mayores:
-# 1. IDENTIFICADOR ALEATORIO: Se reemplaza el contador secuencial por
-#    un generador de códigos alfanuméricos aleatorios (ej. PLAN-X8Y2).
-# 2. IDENTIFICADORES PARA TODOS: Ahora, tanto los Contratos Forjados
-#    como los Planes de Transición (baches) reciben su propio
-#    identificador único.
+# 1. LÍMITE DE ACTIVIDADES: Los planes de transición ahora tienen un
+#    máximo de 5 actividades para asegurar que sean realistas.
+# 2. SELLADO FORMAL DE ITINERARIOS: Los planes de transición ahora
+#    incluyen fecha y hora de sellado, igual que los contratos.
+# 3. RESUMEN DETALLADO: El mensaje final del plan de transición es
+#    más informativo (total de actividades, sellado, identificador).
 
 import g4f
 import re
@@ -14,24 +15,21 @@ from datetime import datetime, timedelta
 import pytz
 import random
 import string
-import json
-import os
 
 class Guardian:
     def __init__(self):
         """
         Inicializa el especialista Guardian.
         """
-        # Ya no necesitamos el archivo de persistencia para esta versión.
-        print(f"    - Especialista 'Guardian' v7.0 (Identificador Universal) listo.")
+        print(f"    - Especialista 'Guardian' v9.0 (Planificador de Precisión) listo.")
 
     # --- FUNCIONES AUXILIARES ---
     def _generar_codigo_plan(self):
         """
-        NUEVA FUNCIÓN MEJORADA: Genera un código alfanumérico aleatorio de 4 caracteres.
+        Genera un código alfanumérico aleatorio.
         """
         caracteres = string.ascii_uppercase + string.digits
-        codigo_aleatorio = ''.join(random.choices(caracteres, k=4))
+        codigo_aleatorio = ''.join(random.choices(caracteres, k=6))
         return f"PLAN-{codigo_aleatorio}"
 
     def _extraer_duracion_de_tarea(self, texto_tarea):
@@ -45,21 +43,32 @@ class Guardian:
         minutos_para_sumar = (5 - dt.minute % 5) % 5
         return dt + timedelta(minutes=minutos_para_sumar)
 
-    def _calendarizar_plan(self, plan_generado, zona_horaria):
+    def _calendarizar_plan(self, plan_generado, zona_horaria, hora_meta):
+        """
+        Calcula el itinerario, incluyendo respiros iniciales y finales.
+        """
         if not plan_generado: return [], 0
+        
         itinerario_final, minutos_descanso_totales = [], 0
         hora_actual = datetime.now(zona_horaria)
+
+        # 1. Respiro Inicial
         respiro_inicial_minutos = random.randint(5, 10)
         hora_despues_respiro = hora_actual + timedelta(minutes=respiro_inicial_minutos)
         proxima_hora_inicio = self._redondear_hora_al_proximo_intervalo_de_5_min(hora_despues_respiro)
         respiro_real_total = (proxima_hora_inicio - hora_actual).total_seconds() / 60
         itinerario_final.append(f"*(Respiro inicial de {int(respiro_real_total)} minutos)*")
+
+        # 2. Itinerario de Tareas
+        ultima_hora_fin = proxima_hora_inicio
         for i, tarea_texto in enumerate(plan_generado):
             duracion_minutos = self._extraer_duracion_de_tarea(tarea_texto)
             if duracion_minutos == 0: continue
+            
             hora_fin = proxima_hora_inicio + timedelta(minutes=duracion_minutos)
             texto_itinerario = f"{proxima_hora_inicio.strftime('%H:%M')} - {hora_fin.strftime('%H:%M')}: {tarea_texto}"
             itinerario_final.append(texto_itinerario)
+            
             if i < len(plan_generado) - 1:
                 descanso_minutos = random.randint(5, 10)
                 hora_despues_descanso = hora_fin + timedelta(minutes=descanso_minutos)
@@ -68,19 +77,22 @@ class Guardian:
                 minutos_descanso_totales += descanso_real_total
                 itinerario_final.append(f"*(Descanso de {int(descanso_real_total)} minutos)*")
                 proxima_hora_inicio = proxima_hora_siguiente
+            else:
+                ultima_hora_fin = hora_fin
+
+        # 3. Respiro Final
+        respiro_final_minutos = (hora_meta - ultima_hora_fin).total_seconds() / 60
+        if respiro_final_minutos > 1:
+             itinerario_final.append(f"*(Respiro final de {int(respiro_final_minutos)} minutos)*")
+
         return itinerario_final, minutos_descanso_totales
 
     def _crear_plan_de_transicion(self, tareas, bache_utilizable):
         if not tareas: return []
-        if bache_utilizable < len(tareas) * 20:
-            tarea_unica = random.choice(tareas)
-            duracion = min(bache_utilizable, 45)
-            duracion = 5 * round(duracion / 5)
-            if duracion < 20: return []
-            return [f"{tarea_unica} ({duracion} min)"]
         plan_final, tiempo_restante = [], bache_utilizable
         random.shuffle(tareas)
         bloques_de_tiempo = [20, 25, 30, 35, 40, 45]
+        
         for tarea in tareas:
             if tiempo_restante < 20: break
             bloques_posibles = [b for b in bloques_de_tiempo if b <= tiempo_restante]
@@ -88,11 +100,17 @@ class Guardian:
             duracion_asignada = random.choice(bloques_posibles)
             plan_final.append(f"{tarea} ({duracion_asignada} min)")
             tiempo_restante -= duracion_asignada
+            
         return plan_final
 
     def _procesar_plan_mixto(self, comando_usuario, bache_utilizable):
+        """
+        FUNCIÓN MEJORADA: Ahora limita el número de tareas a 5.
+        """
+        MAX_TAREAS = 5
         tareas_con_duracion, tareas_sin_duracion, tiempo_comprometido = [], [], 0
         partes = [p.strip() for p in comando_usuario.split(',') if p.strip()]
+        
         for parte in partes:
             duracion = self._extraer_duracion_de_tarea(parte)
             tarea_nombre = re.sub(r'\s*\(\d+\s*min\s*\)', '', parte).strip()
@@ -102,8 +120,22 @@ class Guardian:
                 tiempo_comprometido += duracion
             else:
                 tareas_sin_duracion.append(tarea_nombre)
+
+        # Aplicar límite de 5 tareas
+        if len(tareas_con_duracion) + len(tareas_sin_duracion) > MAX_TAREAS:
+            # Damos prioridad a las que el usuario definió con duración
+            tareas_flexibles_a_mantener = MAX_TAREAS - len(tareas_con_duracion)
+            if tareas_flexibles_a_mantener > 0:
+                random.shuffle(tareas_sin_duracion)
+                tareas_sin_duracion = tareas_sin_duracion[:tareas_flexibles_a_mantener]
+            else:
+                tareas_sin_duracion = [] # No hay espacio para tareas flexibles
+                tareas_con_duracion = tareas_con_duracion[:MAX_TAREAS] # Truncamos las fijas si exceden
+                tiempo_comprometido = sum(self._extraer_duracion_de_tarea(t) for t in tareas_con_duracion)
+
         bache_para_flexibles = bache_utilizable - tiempo_comprometido
         plan_flexible = self._crear_plan_de_transicion(tareas_sin_duracion, bache_para_flexibles)
+        
         plan_final = tareas_con_duracion + plan_flexible
         random.shuffle(plan_final)
         return plan_final
@@ -124,9 +156,6 @@ class Guardian:
         return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": contrato_borrador_texto}
 
     def _forjar_contrato(self, datos_plan):
-        """
-        FUNCIÓN MEJORADA: Usa el nuevo generador de códigos aleatorios.
-        """
         zona_horaria_usuario = pytz.timezone("America/Montevideo")
         ahora = datetime.now(zona_horaria_usuario)
         
@@ -283,7 +312,7 @@ class Guardian:
                     return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en la corrección con ruleta. Reiniciando."}
             
         return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo de diseño. Reiniciando."}
-    # --- MODO TRANSICIÓN (v7.0 - CON IDENTIFICADOR ALEATORIO) ---
+    # --- MODO TRANSICIÓN (v9.0 - CON LÍMITE Y SELLADO FORMAL) ---
     def _presentar_borrador_transicion(self, datos_bache):
         plan_borrador = datos_bache.get("plan_borrador", [])
         if not plan_borrador:
@@ -317,16 +346,17 @@ class Guardian:
                 fecha_inicio_madre = ahora.replace(hour=hora_inicio_madre.hour, minute=hora_inicio_madre.minute, second=0, microsecond=0)
                 if fecha_inicio_madre < ahora:
                     fecha_inicio_madre += timedelta(days=1)
-                bache_total_minutos = int((fecha_inicio_madre - ahora).total_seconds() / 60)
-                if bache_total_minutos <= 20:
-                    return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": f"El bache de solo {bache_total_minutos} minutos es demasiado corto para activar el Modo Transición."}
-                colchon_seguridad = random.randint(10, 20)
-                bache_utilizable = bache_total_minutos - colchon_seguridad
-                if bache_utilizable < 20:
-                    return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": f"Tras restar el colchón de seguridad de {colchon_seguridad} min, el tiempo restante es insuficiente. Reiniciando."}
+                
+                # Se elimina el colchón de seguridad
+                bache_utilizable = int((fecha_inicio_madre - ahora).total_seconds() / 60)
+                
+                if bache_utilizable <= 20:
+                    return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": f"El bache de solo {bache_utilizable} minutos es demasiado corto para activar el Modo Transición."}
+                
                 datos_bache["bache_utilizable_minutos"] = bache_utilizable
+                datos_bache["hora_meta"] = fecha_inicio_madre # Guardamos la hora meta
                 horas, minutos = divmod(bache_utilizable, 60)
-                mensaje = f"Detectado un bache utilizable de **{horas}h y {minutos}min** (con {colchon_seguridad} min de colchón).\n\nAhora, dime las tareas que quieres hacer, separadas por comas."
+                mensaje = f"Detectado un bache utilizable de **{horas}h y {minutos}min**.\n\nAhora, dime las tareas que quieres hacer (máximo 5), separadas por comas."
                 nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_TAREAS_OBJETIVO", "datos_bache": datos_bache}
                 return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": mensaje}
             except Exception as e:
@@ -344,21 +374,23 @@ class Guardian:
         elif paso == "ESPERANDO_CONFIRMACION_PLAN":
             if "confirmar" in comando.lower():
                 plan_final = datos_bache.get("plan_borrador", [])
-                itinerario_agendado, total_descansos = self._calendarizar_plan(plan_final, zona_horaria_usuario)
-                plan_texto = "\n".join([f"**-** {linea}" for linea in itinerario_agendado])
-                tiempo_total_planificado = sum(self._extraer_duracion_de_tarea(t) for t in plan_final)
-                tiempo_total_usado = tiempo_total_planificado + total_descansos
-                tiempo_libre_restante = datos_bache.get("bache_utilizable_minutos", 0) - tiempo_total_usado
+                hora_meta = datos_bache.get("hora_meta")
+                itinerario_agendado, _ = self._calendarizar_plan(plan_final, zona_horaria_usuario, hora_meta)
                 
-                # ¡NUEVO! Generar código aleatorio para el plan de transición
+                plan_texto = "\n".join([f"**-** {linea}" for linea in itinerario_agendado])
+                
+                # Nuevo resumen detallado
+                ahora = datetime.now(zona_horaria_usuario)
+                fecha_sellado = ahora.strftime("%d/%m/%y")
+                hora_sellado = ahora.strftime("%H:%M")
                 codigo_plan = self._generar_codigo_plan()
+                num_actividades = len(plan_final)
 
                 mensaje_final = (f"**PLAN DE TRANSICIÓN AGENDADO**\n--------------------\n"
-                                 f"**Identificador:** {codigo_plan}\n"
-                                 f"Itinerario para tu bache:\n\n{plan_texto}\n\n"
-                                 f"**Tiempo planificado:** {tiempo_total_planificado} min.\n"
-                                 f"**Tiempo libre no asignado:** {int(tiempo_libre_restante)} min.\n--------------------\n"
-                                 f"¡Itinerario sellado!")
+                                 f"{plan_texto}\n--------------------\n"
+                                 f"**Actividades planificadas:** {num_actividades}\n"
+                                 f"**Itinerario sellado:** el {fecha_sellado} a las {hora_sellado}\n"
+                                 f"**Identificador:** {codigo_plan}")
                 return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": mensaje_final}
             elif "corregir" in comando.lower():
                 nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_CATEGORIA_CORRECCION", "datos_bache": datos_bache}
