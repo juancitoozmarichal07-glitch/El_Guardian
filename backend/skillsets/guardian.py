@@ -1,6 +1,7 @@
 # =================================================================
-# GUARDIAN.PY (v10.0 - El Planificador Eficiente)
+# GUARDIAN.PY (v10.1 - El Planificador Meticuloso)
 # =================================================================
+# - CORRECCIÓN: Solucionado bug en Modo Diseño que se saltaba los pasos de "Arranque" y "Duración".
 # - CORRECCIÓN: Solucionado bug en Modo Transición que impedía confirmar/corregir el plan borrador.
 # - MEJORA: Añadida la capacidad de encadenar la creación de múltiples contratos.
 
@@ -17,7 +18,7 @@ class Guardian:
         Inicializa el especialista Guardian.
         """
         self.archivador_contratos = {}
-        print(f"    - Especialista 'Guardian' v10.0 (Planificador Eficiente) listo.")
+        print(f"    - Especialista 'Guardian' v10.1 (Planificador Meticuloso) listo.")
 
     # --- FUNCIONES AUXILIARES ---
     def _generar_id_aleatorio(self, prefijo="PLAN"):
@@ -80,7 +81,6 @@ class Guardian:
     def _crear_plan_de_transicion(self, tareas, bache_utilizable):
         if not tareas: return []
         
-        # Límite de 5 actividades
         tareas = tareas[:5]
 
         if bache_utilizable < len(tareas) * 20:
@@ -157,7 +157,6 @@ class Guardian:
             f"Contrato sellado. ¿Deseas forjar otro contrato? (sí/no)"
         )
         
-        # Nuevo estado para permitir encadenar contratos
         nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ENCADENAR", "datos_plan": {}}
         return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": contrato_texto}
 
@@ -187,12 +186,15 @@ class Guardian:
             nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ESPECIFICACION", "datos_plan": datos_plan}
             return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Misión elegida: **{comando}**. ¿Necesitas especificar más? (sí/no)"}
         
+        # --- SECCIÓN CORREGIDA ---
         elif paso == "ESPERANDO_ESPECIFICACION":
             if "si" in comando.lower():
                 nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_OPCIONES_ESPECIFICACION", "datos_plan": datos_plan}
                 return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Entendido. Dame las opciones para la siguiente capa."}
             else:
-                return self._forjar_contrato(datos_plan)
+                # CORRECCIÓN: Avanza al siguiente paso en lugar de forjar el contrato prematuramente.
+                nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ARRANQUE", "datos_plan": datos_plan}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Misión definida. Ahora, define el **momento de arranque**."}
                 
         elif paso == "ESPERANDO_OPCIONES_ESPECIFICACION":
             opciones = [opt.strip() for opt in comando.split(',') if opt.strip()]
@@ -264,26 +266,12 @@ class Guardian:
             datos_plan["duracion"] = comando
             return self._forjar_contrato(datos_plan)
 
-        # --- NUEVO PASO PARA ENCADENAR CONTRATOS ---
         elif paso == "ESPERANDO_ENCADENAR":
             if "si" in comando.lower():
-                # Reinicia el flujo para un nuevo contrato
                 nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_MISION", "datos_plan": {}}
                 return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Perfecto. Define la misión para el nuevo contrato."}
             else:
-                # Termina y vuelve al modo libre
                 return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Entendido. Guardián en espera."}
-
-        # --- Flujo de corrección (sin cambios) ---
-        elif paso == "ESPERANDO_CONFIRMACION_CONTRATO":
-            # Este paso ya no se usa, se forja directamente. Se mantiene por si se reutiliza.
-            if "confirmar" in comando.lower():
-                return self._forjar_contrato(datos_plan)
-            elif "corregir" in comando.lower():
-                # Lógica de corrección...
-                pass 
-            else:
-                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "No te he entendido. Por favor, responde 'confirmar' o 'corregir'."}
             
         return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo de diseño. Reiniciando."}
     # --- MODO TRANSICIÓN (v4.0 - CON CICLO DE CORRECCIÓN Y BUGFIX) ---
@@ -321,7 +309,6 @@ class Guardian:
                 
                 bache_total_minutos = int((fecha_inicio_madre - ahora).total_seconds() / 60)
                 
-                # Respiro final de seguridad
                 respiro_final = random.randint(5, 10)
                 bache_utilizable = bache_total_minutos - respiro_final
 
@@ -463,19 +450,16 @@ class Guardian:
         palabras_clave_diseno = ["diseñar", "contrato", "forjar", "crear", "ruleta", "modo diseño"]
         palabras_clave_transicion = ["transicion", "bache", "preparar", "plan", "agendar", "negociar"]
         
-        # Prioridad para el Modo Transición si se mencionan ambas
         if any(palabra in comando_lower for palabra in palabras_clave_transicion) and estado.get("modo") != "transicion":
             nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_ACTIVIDAD_MADRE", "datos_bache": {}}
             return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Transición activado. ¿Cuál es la actividad principal que harás después?"}
 
         if any(palabra in comando_lower for palabra in palabras_clave_diseno) and estado.get("modo") != "diseño":
-            # Si el usuario pide un contrato por su ID
             match_id = re.search(r'([A-Z]{4,5}-[A-Z0-9]{4})', comando, re.IGNORECASE)
             if match_id:
                 contrato_id = match_id.group(1).upper()
                 contrato = self.archivador_contratos.get(contrato_id)
                 if contrato:
-                    # Reconstruir y mostrar el contrato
                     contrato_texto = (
                         f"**CONTRATO RECUPERADO**\n--------------------\n"
                         f"**Misión:** {contrato['mision']}\n"
