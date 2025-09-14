@@ -1,6 +1,7 @@
 # =================================================================
-# GUARDIAN.PY (v10.1 - El Planificador Meticuloso)
+# GUARDIAN.PY (v10.2 - El Revisor)
 # =================================================================
+# - MEJORA: Restaurado el paso de "Contrato Borrador" para revisión antes de forjar.
 # - CORRECCIÓN: Solucionado bug en Modo Diseño que se saltaba los pasos de "Arranque" y "Duración".
 # - CORRECCIÓN: Solucionado bug en Modo Transición que impedía confirmar/corregir el plan borrador.
 # - MEJORA: Añadida la capacidad de encadenar la creación de múltiples contratos.
@@ -18,7 +19,7 @@ class Guardian:
         Inicializa el especialista Guardian.
         """
         self.archivador_contratos = {}
-        print(f"    - Especialista 'Guardian' v10.1 (Planificador Meticuloso) listo.")
+        print(f"    - Especialista 'Guardian' v10.2 (El Revisor) listo.")
 
     # --- FUNCIONES AUXILIARES ---
     def _generar_id_aleatorio(self, prefijo="PLAN"):
@@ -124,6 +125,22 @@ class Guardian:
         return plan_final
 
     # --- FUNCIONES DEL MODO DISEÑO ---
+    def _presentar_borrador_contrato(self, datos_plan):
+        mision_base = datos_plan.get('mision', 'N/A')
+        especificaciones = datos_plan.get('especificaciones', [])
+        mision_completa = f"{mision_base} -> {' -> '.join(especificaciones)}" if especificaciones else mision_base
+        
+        contrato_borrador_texto = (
+            f"**CONTRATO BORRADOR**\n--------------------\n"
+            f"**Misión:** {mision_completa}\n"
+            f"**Arranque:** {datos_plan.get('arranque', 'N/A')}\n"
+            f"**Duración:** {datos_plan.get('duracion', 'N/A')}\n--------------------\n"
+            f"¿Confirmas este contrato o quieres corregir algo? (confirmar/corregir)"
+        )
+        
+        nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_CONFIRMACION_CONTRATO", "datos_plan": datos_plan}
+        return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": contrato_borrador_texto}
+
     def _forjar_contrato(self, datos_plan):
         zona_horaria_usuario = pytz.timezone("America/Montevideo")
         ahora = datetime.now(zona_horaria_usuario)
@@ -176,23 +193,15 @@ class Guardian:
                 return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
         
         elif paso == "ESPERANDO_RESULTADO_MISION":
-            if datos_plan.get("corrigiendo_con_ruleta"):
-                datos_plan.pop("corrigiendo_con_ruleta", None)
-                datos_plan.pop("campo_en_edicion", None)
-                datos_plan["mision"] = comando
-                return self._presentar_borrador_contrato(datos_plan)
-            
             datos_plan["mision"] = comando
             nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ESPECIFICACION", "datos_plan": datos_plan}
             return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Misión elegida: **{comando}**. ¿Necesitas especificar más? (sí/no)"}
         
-        # --- SECCIÓN CORREGIDA ---
         elif paso == "ESPERANDO_ESPECIFICACION":
             if "si" in comando.lower():
                 nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_OPCIONES_ESPECIFICACION", "datos_plan": datos_plan}
                 return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Entendido. Dame las opciones para la siguiente capa."}
             else:
-                # CORRECCIÓN: Avanza al siguiente paso en lugar de forjar el contrato prematuramente.
                 nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ARRANQUE", "datos_plan": datos_plan}
                 return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Misión definida. Ahora, define el **momento de arranque**."}
                 
@@ -228,12 +237,6 @@ class Guardian:
                 return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
                 
         elif paso == "ESPERANDO_RESULTADO_ARRANQUE":
-            if datos_plan.get("corrigiendo_con_ruleta"):
-                datos_plan.pop("corrigiendo_con_ruleta", None)
-                datos_plan.pop("campo_en_edicion", None)
-                datos_plan["arranque"] = comando
-                return self._presentar_borrador_contrato(datos_plan)
-
             datos_plan["arranque"] = comando
             nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_DECISION_DURACION", "datos_plan": datos_plan}
             return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Arranque: **{comando}**. ¿Necesitas definir una duración? (sí/no)"}
@@ -244,27 +247,31 @@ class Guardian:
                 return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Entendido. Dime las opciones para la duración."}
             else:
                 datos_plan["duracion"] = "No definida"
-                return self._forjar_contrato(datos_plan)
+                return self._presentar_borrador_contrato(datos_plan)
                 
         elif paso == "ESPERANDO_DURACION":
             opciones = [opt.strip() for opt in comando.split(',') if opt.strip()]
             if not opciones: return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Define la duración."}
             if len(opciones) == 1:
                 datos_plan["duracion"] = opciones[0]
-                return self._forjar_contrato(datos_plan)
+                return self._presentar_borrador_contrato(datos_plan)
             else:
                 estado_actual["paso_diseno"] = "ESPERANDO_RESULTADO_DURACION"
                 return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
                 
         elif paso == "ESPERANDO_RESULTADO_DURACION":
-            if datos_plan.get("corrigiendo_con_ruleta"):
-                datos_plan.pop("corrigiendo_con_ruleta", None)
-                datos_plan.pop("campo_en_edicion", None)
-                datos_plan["duracion"] = comando
-                return self._presentar_borrador_contrato(datos_plan)
-
             datos_plan["duracion"] = comando
-            return self._forjar_contrato(datos_plan)
+            return self._presentar_borrador_contrato(datos_plan)
+
+        # --- NUEVO PASO PARA CONFIRMAR EL BORRADOR ---
+        elif paso == "ESPERANDO_CONFIRMACION_CONTRATO":
+            if "confirmar" in comando.lower():
+                return self._forjar_contrato(datos_plan)
+            elif "corregir" in comando.lower():
+                # Aquí podríamos implementar la lógica de corrección más adelante
+                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "La función de corregir aún no está implementada. Por favor, reinicia el proceso."}
+            else:
+                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "No te he entendido. Por favor, responde 'confirmar' o 'corregir'."}
 
         elif paso == "ESPERANDO_ENCADENAR":
             if "si" in comando.lower():
@@ -332,7 +339,6 @@ class Guardian:
             datos_bache["plan_borrador"] = plan_generado
             return self._presentar_borrador_transicion(datos_bache)
 
-        # --- SECCIÓN CORREGIDA ---
         elif paso == "ESPERANDO_CONFIRMACION_PLAN":
             comando_lower = comando.lower()
             if "confirmar" in comando_lower:
@@ -483,4 +489,3 @@ class Guardian:
 
         respuesta_conversacional = await self._gestionar_charla_ia(comando)
         return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": respuesta_conversacional}
-
