@@ -1,10 +1,10 @@
 # =================================================================
-# GUARDIAN.PY (v10.2 - El Revisor)
+# GUARDIAN.PY (v11.0 - El Archivista Persistente)
 # =================================================================
-# - MEJORA: Restaurado el paso de "Contrato Borrador" para revisión antes de forjar.
-# - CORRECCIÓN: Solucionado bug en Modo Diseño que se saltaba los pasos de "Arranque" y "Duración".
-# - CORRECCIÓN: Solucionado bug en Modo Transición que impedía confirmar/corregir el plan borrador.
-# - MEJORA: Añadida la capacidad de encadenar la creación de múltiples contratos.
+# - MEJORA: Implementada memoria persistente. El Guardián ahora guarda y carga
+#           contratos y datos de usuario desde un archivo 'guardian_memory.json'.
+# - MEJORA: Añadida la base para el sistema de rachas y logros.
+# - (Incluye todas las correcciones y mejoras anteriores)
 
 import g4f
 import re
@@ -12,14 +12,48 @@ from datetime import datetime, timedelta
 import pytz
 import random
 import string
+import json
+import os
 
 class Guardian:
     def __init__(self):
         """
-        Inicializa el especialista Guardian.
+        Inicializa el especialista Guardian y carga la memoria persistente.
         """
+        self.memory_file = "guardian_memory.json"
         self.archivador_contratos = {}
-        print(f"    - Especialista 'Guardian' v10.2 (El Revisor) listo.")
+        self.datos_usuario = {
+            "racha_diaria": 0,
+            "fecha_ultima_racha": None,
+            "logros": []
+        }
+        self._cargar_memoria()
+        print(f"    - Especialista 'Guardian' v11.0 (Archivista Persistente) listo.")
+
+    # --- GESTIÓN DE MEMORIA PERSISTENTE ---
+    def _cargar_memoria(self):
+        if os.path.exists(self.memory_file):
+            try:
+                with open(self.memory_file, 'r', encoding='utf-8') as f:
+                    memoria = json.load(f)
+                    self.archivador_contratos = memoria.get("archivador_contratos", {})
+                    self.datos_usuario = memoria.get("datos_usuario", self.datos_usuario)
+                    print("      -> Memoria del Guardián cargada exitosamente.")
+            except (json.JSONDecodeError, IOError) as e:
+                print(f"      -> 🚨 Error al cargar la memoria: {e}. Se usará una memoria nueva.")
+        else:
+            print("      -> No se encontró archivo de memoria. Se creará uno nuevo.")
+
+    def _guardar_memoria(self):
+        try:
+            with open(self.memory_file, 'w', encoding='utf-8') as f:
+                memoria = {
+                    "archivador_contratos": self.archivador_contratos,
+                    "datos_usuario": self.datos_usuario
+                }
+                json.dump(memoria, f, indent=4, ensure_ascii=False)
+        except IOError as e:
+            print(f"      -> 🚨 Error crítico al guardar la memoria: {e}")
 
     # --- FUNCIONES AUXILIARES ---
     def _generar_id_aleatorio(self, prefijo="PLAN"):
@@ -163,6 +197,9 @@ class Guardian:
             "id": identificador
         }
         self.archivador_contratos[identificador] = contrato_obj
+        
+        # Guardar la memoria después de añadir un contrato
+        self._guardar_memoria()
 
         contrato_texto = (
             f"**CONTRATO FORJADO**\n--------------------\n"
@@ -263,12 +300,10 @@ class Guardian:
             datos_plan["duracion"] = comando
             return self._presentar_borrador_contrato(datos_plan)
 
-        # --- NUEVO PASO PARA CONFIRMAR EL BORRADOR ---
         elif paso == "ESPERANDO_CONFIRMACION_CONTRATO":
             if "confirmar" in comando.lower():
                 return self._forjar_contrato(datos_plan)
             elif "corregir" in comando.lower():
-                # Aquí podríamos implementar la lógica de corrección más adelante
                 return {"nuevo_estado": estado_actual, "mensaje_para_ui": "La función de corregir aún no está implementada. Por favor, reinicia el proceso."}
             else:
                 return {"nuevo_estado": estado_actual, "mensaje_para_ui": "No te he entendido. Por favor, responde 'confirmar' o 'corregir'."}
@@ -360,7 +395,17 @@ class Guardian:
                     f"**Identificador:** {identificador}\n--------------------\n"
                     f"¡Itinerario sellado!"
                 )
-                self.archivador_contratos[identificador] = {"tipo": "Bache", "id": identificador, "itinerario": itinerario_agendado}
+                
+                bache_obj = {
+                    "tipo": "Bache",
+                    "id": identificador,
+                    "itinerario": itinerario_agendado,
+                    "fecha_sellado": ahora.strftime('%d/%m/%y'),
+                    "hora_sellado": ahora.strftime('%H:%M')
+                }
+                self.archivador_contratos[identificador] = bache_obj
+                self._guardar_memoria() # Guardar la memoria después de añadir un bache
+                
                 return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": mensaje_final}
 
             elif "corregir" in comando_lower:
@@ -466,17 +511,26 @@ class Guardian:
                 contrato_id = match_id.group(1).upper()
                 contrato = self.archivador_contratos.get(contrato_id)
                 if contrato:
-                    contrato_texto = (
-                        f"**CONTRATO RECUPERADO**\n--------------------\n"
-                        f"**Misión:** {contrato['mision']}\n"
-                        f"**Arranque:** {contrato['arranque']}\n"
-                        f"**Duración:** {contrato['duracion']}\n"
-                        f"**Sellado:** {contrato['fecha_sellado']} a las {contrato['hora_sellado']}\n"
-                        f"**Identificador:** {contrato['id']}\n--------------------"
-                    )
+                    if contrato.get("tipo") == "Bache":
+                         contrato_texto = (
+                            f"**PLAN DE TRANSICIÓN RECUPERADO**\n--------------------\n"
+                            f"**Identificador:** {contrato['id']}\n"
+                            f"**Sellado:** {contrato['fecha_sellado']} a las {contrato['hora_sellado']}\n"
+                            f"**Itinerario:**\n" + "\n".join([f"- {linea}" for linea in contrato['itinerario']]) +
+                            "\n--------------------"
+                        )
+                    else: # Es un Contrato normal
+                        contrato_texto = (
+                            f"**CONTRATO RECUPERADO**\n--------------------\n"
+                            f"**Misión:** {contrato['mision']}\n"
+                            f"**Arranque:** {contrato['arranque']}\n"
+                            f"**Duración:** {contrato['duracion']}\n"
+                            f"**Sellado:** {contrato['fecha_sellado']} a las {contrato['hora_sellado']}\n"
+                            f"**Identificador:** {contrato['id']}\n--------------------"
+                        )
                     return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": contrato_texto}
                 else:
-                    return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": f"No se encontró ningún contrato con el identificador {contrato_id}."}
+                    return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": f"No se encontró ningún plan con el identificador {contrato_id}."}
 
             nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_MISION", "datos_plan": {}}
             return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Diseño activado. Define la misión."}
