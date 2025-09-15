@@ -1,10 +1,11 @@
 # =================================================================
-# GUARDIAN.PY (v11.0 - El Archivista Persistente)
+# GUARDIAN.PY (v13.0 - El Estilista Preciso)
 # =================================================================
-# - MEJORA: Implementada memoria persistente. El Guardián ahora guarda y carga
-#           contratos y datos de usuario desde un archivo 'guardian_memory.json'.
-# - MEJORA: Añadida la base para el sistema de rachas y logros.
-# - (Incluye todas las correcciones y mejoras anteriores)
+# - MEJORA: Implementado ciclo de corrección completo para el Modo Diseño (Contratos).
+# - MEJORA: Eliminado el "colchón de seguridad" final en los baches de tiempo.
+# - MEJORA: Las horas ahora se muestran en formato 12h con AM/PM.
+# - MEJORA: Las duraciones de las tareas ahora siempre incluyen "min".
+# - (Incluye todas las mejoras y correcciones anteriores)
 
 import g4f
 import re
@@ -28,7 +29,7 @@ class Guardian:
             "logros": []
         }
         self._cargar_memoria()
-        print(f"    - Especialista 'Guardian' v11.0 (Archivista Persistente) listo.")
+        print(f"    - Especialista 'Guardian' v13.0 (El Estilista Preciso) listo.")
 
     # --- GESTIÓN DE MEMORIA PERSISTENTE ---
     def _cargar_memoria(self):
@@ -91,7 +92,7 @@ class Guardian:
         
         proxima_hora_inicio = hora_inicio_redondeada + timedelta(minutes=respiro_inicial_redondeado)
         
-        itinerario_final.append(f"**(Respiro inicial de {respiro_inicial_redondeado} minutos)**")
+        itinerario_final.append(f"**(Respiro inicial de {respiro_inicial_redondeado} min)**")
 
         for i, tarea_texto in enumerate(plan_generado):
             duracion_minutos = self._extraer_duracion_de_tarea(tarea_texto)
@@ -99,7 +100,9 @@ class Guardian:
             
             hora_fin = proxima_hora_inicio + timedelta(minutes=duracion_minutos)
             
-            texto_itinerario = f"{proxima_hora_inicio.strftime('%H:%M')} - {hora_fin.strftime('%H:%M')}: {tarea_texto}"
+            # MEJORA: Formato de hora con AM/PM
+            formato_hora = "%I:%M %p"
+            texto_itinerario = f"{proxima_hora_inicio.strftime(formato_hora)} - {hora_fin.strftime(formato_hora)}: {tarea_texto}"
             itinerario_final.append(texto_itinerario)
             
             proxima_hora_inicio = hora_fin
@@ -108,7 +111,7 @@ class Guardian:
                 descanso_minutos = random.randint(5, 10)
                 descanso_redondeado = 5 * round(descanso_minutos / 5)
                 minutos_descanso_totales += descanso_redondeado
-                itinerario_final.append(f"*(Descanso de {descanso_redondeado} minutos)*")
+                itinerario_final.append(f"*(Descanso de {descanso_redondeado} min)*")
                 proxima_hora_inicio += timedelta(minutes=descanso_redondeado)
                 
         return itinerario_final, minutos_descanso_totales
@@ -146,6 +149,7 @@ class Guardian:
             tarea_nombre = re.sub(r'\s*\(\d+\s*min\s*\)', '', parte).strip()
             tarea_nombre = re.sub(r'\s*\(\d+\)', '', tarea_nombre).strip()
             if duracion > 0:
+                # MEJORA: Asegurar que siempre se añada "min"
                 tareas_con_duracion.append(f"{tarea_nombre} ({duracion} min)")
                 tiempo_comprometido += duracion
             else:
@@ -179,7 +183,7 @@ class Guardian:
         zona_horaria_usuario = pytz.timezone("America/Montevideo")
         ahora = datetime.now(zona_horaria_usuario)
         fecha_sellado = ahora.strftime("%d/%m/%y")
-        hora_sellado = ahora.strftime("%H:%M")
+        hora_sellado = ahora.strftime("%I:%M %p") # MEJORA: Formato AM/PM
         
         mision_base = datos_plan.get('mision', 'N/A')
         especificaciones = datos_plan.get('especificaciones', [])
@@ -198,7 +202,6 @@ class Guardian:
         }
         self.archivador_contratos[identificador] = contrato_obj
         
-        # Guardar la memoria después de añadir un contrato
         self._guardar_memoria()
 
         contrato_texto = (
@@ -230,6 +233,12 @@ class Guardian:
                 return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
         
         elif paso == "ESPERANDO_RESULTADO_MISION":
+            if datos_plan.get("corrigiendo_con_ruleta"):
+                datos_plan.pop("corrigiendo_con_ruleta", None)
+                datos_plan.pop("campo_en_edicion", None)
+                datos_plan["mision"] = comando
+                return self._presentar_borrador_contrato(datos_plan)
+            
             datos_plan["mision"] = comando
             nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ESPECIFICACION", "datos_plan": datos_plan}
             return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Misión elegida: **{comando}**. ¿Necesitas especificar más? (sí/no)"}
@@ -274,6 +283,12 @@ class Guardian:
                 return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
                 
         elif paso == "ESPERANDO_RESULTADO_ARRANQUE":
+            if datos_plan.get("corrigiendo_con_ruleta"):
+                datos_plan.pop("corrigiendo_con_ruleta", None)
+                datos_plan.pop("campo_en_edicion", None)
+                datos_plan["arranque"] = comando
+                return self._presentar_borrador_contrato(datos_plan)
+
             datos_plan["arranque"] = comando
             nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_DECISION_DURACION", "datos_plan": datos_plan}
             return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Arranque: **{comando}**. ¿Necesitas definir una duración? (sí/no)"}
@@ -297,6 +312,12 @@ class Guardian:
                 return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
                 
         elif paso == "ESPERANDO_RESULTADO_DURACION":
+            if datos_plan.get("corrigiendo_con_ruleta"):
+                datos_plan.pop("corrigiendo_con_ruleta", None)
+                datos_plan.pop("campo_en_edicion", None)
+                datos_plan["duracion"] = comando
+                return self._presentar_borrador_contrato(datos_plan)
+
             datos_plan["duracion"] = comando
             return self._presentar_borrador_contrato(datos_plan)
 
@@ -304,9 +325,51 @@ class Guardian:
             if "confirmar" in comando.lower():
                 return self._forjar_contrato(datos_plan)
             elif "corregir" in comando.lower():
-                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "La función de corregir aún no está implementada. Por favor, reinicia el proceso."}
+                nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_CAMPO_A_CORREGIR", "datos_plan": datos_plan}
+                mensaje = "Entendido. ¿Qué campo quieres corregir? (misión / arranque / duración)"
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": mensaje}
             else:
                 return {"nuevo_estado": estado_actual, "mensaje_para_ui": "No te he entendido. Por favor, responde 'confirmar' o 'corregir'."}
+
+        elif paso == "ESPERANDO_CAMPO_A_CORREGIR":
+            campo_a_corregir = comando.lower()
+            if campo_a_corregir in ["misión", "mision", "arranque", "duración", "duracion"]:
+                if campo_a_corregir == "mision": campo_a_corregir = "misión"
+                if campo_a_corregir == "duracion": campo_a_corregir = "duración"
+                
+                datos_plan["campo_en_edicion"] = campo_a_corregir
+                nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_NUEVO_VALOR", "datos_plan": datos_plan}
+                mensaje = f"De acuerdo. ¿Cuál es el nuevo valor para '{campo_a_corregir}'?"
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": mensaje}
+            else:
+                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Campo no válido. Por favor, elige entre 'misión', 'arranque' o 'duración'."}
+
+        elif paso == "ESPERANDO_NUEVO_VALOR":
+            campo_en_edicion = datos_plan.get("campo_en_edicion")
+            opciones = [opt.strip() for opt in comando.split(',') if opt.strip()]
+            
+            if len(opciones) == 1:
+                datos_plan.pop("campo_en_edicion", None)
+                if campo_en_edicion == "misión":
+                    datos_plan["mision"] = comando
+                    datos_plan.pop("especificaciones", None)
+                else:
+                    datos_plan[campo_en_edicion] = comando
+                return self._presentar_borrador_contrato(datos_plan)
+            
+            else:
+                mapa_pasos = {
+                    "misión": "ESPERANDO_RESULTADO_MISION",
+                    "arranque": "ESPERANDO_RESULTADO_ARRANQUE",
+                    "duración": "ESPERANDO_RESULTADO_DURACION"
+                }
+                paso_siguiente = mapa_pasos.get(campo_en_edicion)
+                if paso_siguiente:
+                    datos_plan["corrigiendo_con_ruleta"] = True
+                    estado_actual["paso_diseno"] = paso_siguiente
+                    return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
+                else:
+                    return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en la corrección con ruleta. Reiniciando."}
 
         elif paso == "ESPERANDO_ENCADENAR":
             if "si" in comando.lower():
@@ -316,7 +379,7 @@ class Guardian:
                 return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Entendido. Guardián en espera."}
             
         return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo de diseño. Reiniciando."}
-    # --- MODO TRANSICIÓN (v4.0 - CON CICLO DE CORRECCIÓN Y BUGFIX) ---
+    # --- MODO TRANSICIÓN (v4.0 - CON CICLO DE CORRECCIÓN Y MEJORAS) ---
     def _presentar_borrador_transicion(self, datos_bache):
         plan_borrador = datos_bache.get("plan_borrador", [])
         if not plan_borrador:
@@ -349,18 +412,15 @@ class Guardian:
                 if fecha_inicio_madre < ahora:
                     fecha_inicio_madre += timedelta(days=1)
                 
-                bache_total_minutos = int((fecha_inicio_madre - ahora).total_seconds() / 60)
-                
-                respiro_final = random.randint(5, 10)
-                bache_utilizable = bache_total_minutos - respiro_final
+                # MEJORA: Eliminado el colchón de seguridad. El bache es el tiempo total.
+                bache_utilizable = int((fecha_inicio_madre - ahora).total_seconds() / 60)
 
                 if bache_utilizable < 20:
-                    return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": f"El bache de solo {bache_total_minutos} min es demasiado corto (necesario al menos 20 min + respiro final)."}
+                    return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": f"El bache de solo {bache_utilizable} min es demasiado corto (se necesita un mínimo de 20 min)."}
                 
                 datos_bache["bache_utilizable_minutos"] = bache_utilizable
-                datos_bache["respiro_final_minutos"] = respiro_final
                 horas, minutos = divmod(bache_utilizable, 60)
-                mensaje = (f"Detectado un bache utilizable de **{horas}h y {minutos}min** (reservando {respiro_final} min de respiro al final).\n\n"
+                mensaje = (f"Detectado un bache total de **{horas}h y {minutos}min**.\n\n"
                            f"Ahora, dime las tareas que quieres hacer (máximo 5), separadas por comas.")
                 nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_TAREAS_OBJETIVO", "datos_bache": datos_bache}
                 return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": mensaje}
@@ -391,7 +451,7 @@ class Guardian:
                     f"Itinerario para tu bache:\n\n{plan_texto}\n\n"
                     f"**Actividades planificadas:** {len(plan_final)}\n"
                     f"**Tiempo total planificado:** {tiempo_total_planificado} min\n"
-                    f"**Itinerario sellado:** {ahora.strftime('%d/%m/%y a las %H:%M')}\n"
+                    f"**Itinerario sellado:** {ahora.strftime('%d/%m/%y a las %I:%M %p')}\n" # MEJORA: Formato AM/PM
                     f"**Identificador:** {identificador}\n--------------------\n"
                     f"¡Itinerario sellado!"
                 )
@@ -401,10 +461,10 @@ class Guardian:
                     "id": identificador,
                     "itinerario": itinerario_agendado,
                     "fecha_sellado": ahora.strftime('%d/%m/%y'),
-                    "hora_sellado": ahora.strftime('%H:%M')
+                    "hora_sellado": ahora.strftime('%I:%M %p') # MEJORA: Formato AM/PM
                 }
                 self.archivador_contratos[identificador] = bache_obj
-                self._guardar_memoria() # Guardar la memoria después de añadir un bache
+                self._guardar_memoria()
                 
                 return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": mensaje_final}
 
@@ -424,7 +484,7 @@ class Guardian:
             elif "duraciones" in comando.lower():
                 nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_CORRECCION_DURACIONES", "datos_bache": datos_bache}
                 plan_actual_texto = "\n".join([f"{i+1}. {t}" for i, t in enumerate(datos_bache.get("plan_borrador", []))])
-                mensaje = f"De acuerdo. Este es el plan actual:\n\n{plan_actual_texto}\n\nDime el número de la tarea y la nueva duración. Si no pones duración, la elegiré yo.\n*Ej: 1: 25, 3, 4 (35)*"
+                mensaje = f"De acuerdo. Este es el plan actual:\n\n{plan_actual_texto}\n\nDime el número de la tarea y la nueva duración. Si no pones duración, la elegiré yo.\n*Ej: 1: 25, 3, 4 (35 min)*"
                 return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": mensaje}
             else:
                 return {"nuevo_estado": estado_actual, "mensaje_para_ui": "Categoría no válida. Elige 'Tareas' o 'Duraciones'."}
@@ -519,7 +579,7 @@ class Guardian:
                             f"**Itinerario:**\n" + "\n".join([f"- {linea}" for linea in contrato['itinerario']]) +
                             "\n--------------------"
                         )
-                    else: # Es un Contrato normal
+                    else:
                         contrato_texto = (
                             f"**CONTRATO RECUPERADO**\n--------------------\n"
                             f"**Misión:** {contrato['mision']}\n"
