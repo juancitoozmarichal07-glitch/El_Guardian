@@ -1,10 +1,10 @@
 # =================================================================
-# GUARDIAN.PY (v13.0 - El Estilista Preciso)
+# GUARDIAN.PY (v14.0 - El Comandante)
 # =================================================================
-# - MEJORA: Implementado ciclo de corrección completo para el Modo Diseño (Contratos).
-# - MEJORA: Eliminado el "colchón de seguridad" final en los baches de tiempo.
-# - MEJORA: Las horas ahora se muestran en formato 12h con AM/PM.
-# - MEJORA: Las duraciones de las tareas ahora siempre incluyen "min".
+# - MEJORA RADICAL: La activación de modos ahora es explícita con "Activar [modo]".
+# - MEJORA: Añadido comando universal "cancelar" para abortar operaciones.
+# - MEJORA: La confirmación y corrección ahora aceptan múltiples sinónimos.
+# - MEJORA: La corrección de la misión ahora pregunta si se deben mantener las capas.
 # - (Incluye todas las mejoras y correcciones anteriores)
 
 import g4f
@@ -28,8 +28,14 @@ class Guardian:
             "fecha_ultima_racha": None,
             "logros": []
         }
+        # MEJORA: Listas de sinónimos para comandos flexibles
+        self.PALABRAS_CONFIRMACION = ["confirmar", "confirmo", "acepto", "dale", "proceder", "adelante", "si", "sí"]
+        self.PALABRAS_CORRECCION = ["corregir", "corrijo", "editar", "cambiar", "modificar", "ajustar"]
+        self.PALABRAS_SI = ["si", "sí", "claro", "afirmativo"]
+        self.PALABRAS_NO = ["no", "negativo", "cancelar"]
+
         self._cargar_memoria()
-        print(f"    - Especialista 'Guardian' v13.0 (El Estilista Preciso) listo.")
+        print(f"    - Especialista 'Guardian' v14.0 (El Comandante) listo.")
 
     # --- GESTIÓN DE MEMORIA PERSISTENTE ---
     def _cargar_memoria(self):
@@ -100,7 +106,6 @@ class Guardian:
             
             hora_fin = proxima_hora_inicio + timedelta(minutes=duracion_minutos)
             
-            # MEJORA: Formato de hora con AM/PM
             formato_hora = "%I:%M %p"
             texto_itinerario = f"{proxima_hora_inicio.strftime(formato_hora)} - {hora_fin.strftime(formato_hora)}: {tarea_texto}"
             itinerario_final.append(texto_itinerario)
@@ -149,7 +154,6 @@ class Guardian:
             tarea_nombre = re.sub(r'\s*\(\d+\s*min\s*\)', '', parte).strip()
             tarea_nombre = re.sub(r'\s*\(\d+\)', '', tarea_nombre).strip()
             if duracion > 0:
-                # MEJORA: Asegurar que siempre se añada "min"
                 tareas_con_duracion.append(f"{tarea_nombre} ({duracion} min)")
                 tiempo_comprometido += duracion
             else:
@@ -173,7 +177,7 @@ class Guardian:
             f"**Misión:** {mision_completa}\n"
             f"**Arranque:** {datos_plan.get('arranque', 'N/A')}\n"
             f"**Duración:** {datos_plan.get('duracion', 'N/A')}\n--------------------\n"
-            f"¿Confirmas este contrato o quieres corregir algo? (confirmar/corregir)"
+            f"¿Confirmas este contrato o quieres corregir algo?"
         )
         
         nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_CONFIRMACION_CONTRATO", "datos_plan": datos_plan}
@@ -183,7 +187,7 @@ class Guardian:
         zona_horaria_usuario = pytz.timezone("America/Montevideo")
         ahora = datetime.now(zona_horaria_usuario)
         fecha_sellado = ahora.strftime("%d/%m/%y")
-        hora_sellado = ahora.strftime("%I:%M %p") # MEJORA: Formato AM/PM
+        hora_sellado = ahora.strftime("%I:%M %p")
         
         mision_base = datos_plan.get('mision', 'N/A')
         especificaciones = datos_plan.get('especificaciones', [])
@@ -201,7 +205,6 @@ class Guardian:
             "id": identificador
         }
         self.archivador_contratos[identificador] = contrato_obj
-        
         self._guardar_memoria()
 
         contrato_texto = (
@@ -211,7 +214,7 @@ class Guardian:
             f"**Duración:** {contrato_obj['duracion']}\n"
             f"**Sellado:** {fecha_sellado} a las {hora_sellado}\n"
             f"**Identificador:** {identificador}\n--------------------\n"
-            f"Contrato sellado. ¿Deseas forjar otro contrato? (sí/no)"
+            f"Contrato sellado. ¿Deseas forjar otro contrato?"
         )
         
         nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ENCADENAR", "datos_plan": {}}
@@ -220,6 +223,7 @@ class Guardian:
     def _gestionar_diseno(self, estado_actual, comando):
         paso = estado_actual.get("paso_diseno")
         datos_plan = estado_actual.get("datos_plan", {})
+        comando_lower = comando.lower()
         
         if paso == "ESPERANDO_MISION":
             opciones = [opt.strip() for opt in comando.split(',') if opt.strip()]
@@ -227,7 +231,7 @@ class Guardian:
             if len(opciones) == 1:
                 datos_plan["mision"] = opciones[0]
                 nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ESPECIFICACION", "datos_plan": datos_plan}
-                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Misión: **{opciones[0]}**. ¿Necesitas especificar más? (sí/no)"}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Misión: **{opciones[0]}**. ¿Necesitas especificar más?"}
             else:
                 estado_actual["paso_diseno"] = "ESPERANDO_RESULTADO_MISION"
                 return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
@@ -235,16 +239,19 @@ class Guardian:
         elif paso == "ESPERANDO_RESULTADO_MISION":
             if datos_plan.get("corrigiendo_con_ruleta"):
                 datos_plan.pop("corrigiendo_con_ruleta", None)
-                datos_plan.pop("campo_en_edicion", None)
+                campo_en_edicion = datos_plan.pop("campo_en_edicion", None)
                 datos_plan["mision"] = comando
+                if campo_en_edicion and "especificaciones" in datos_plan:
+                    nuevo_estado = {"modo": "diseño", "paso_diseno": "PREGUNTAR_MANTENER_CAPAS", "datos_plan": datos_plan}
+                    return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Has cambiado la misión. ¿Quieres mantener las especificaciones (capas) actuales?"}
                 return self._presentar_borrador_contrato(datos_plan)
             
             datos_plan["mision"] = comando
             nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ESPECIFICACION", "datos_plan": datos_plan}
-            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Misión elegida: **{comando}**. ¿Necesitas especificar más? (sí/no)"}
+            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Misión elegida: **{comando}**. ¿Necesitas especificar más?"}
         
         elif paso == "ESPERANDO_ESPECIFICACION":
-            if "si" in comando.lower():
+            if any(palabra in comando_lower for palabra in self.PALABRAS_SI):
                 nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_OPCIONES_ESPECIFICACION", "datos_plan": datos_plan}
                 return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Entendido. Dame las opciones para la siguiente capa."}
             else:
@@ -259,7 +266,7 @@ class Guardian:
                 datos_plan["especificaciones"].append(opciones[0])
                 mision_completa = f"{datos_plan.get('mision', '')} -> {' -> '.join(datos_plan['especificaciones'])}"
                 nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ESPECIFICACION", "datos_plan": datos_plan}
-                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Entendido: **{mision_completa}**. ¿Otra capa más? (sí/no)"}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Entendido: **{mision_completa}**. ¿Otra capa más?"}
             else:
                 estado_actual["paso_diseno"] = "ESPERANDO_RESULTADO_ESPECIFICACION"
                 return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
@@ -269,7 +276,7 @@ class Guardian:
             datos_plan["especificaciones"].append(comando)
             mision_completa = f"{datos_plan.get('mision', '')} -> {' -> '.join(datos_plan['especificaciones'])}"
             nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ESPECIFICACION", "datos_plan": datos_plan}
-            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Entendido: **{mision_completa}**. ¿Otra capa más? (sí/no)"}
+            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Entendido: **{mision_completa}**. ¿Otra capa más?"}
             
         elif paso == "ESPERANDO_ARRANQUE":
             opciones = [opt.strip() for opt in comando.split(',') if opt.strip()]
@@ -277,7 +284,7 @@ class Guardian:
             if len(opciones) == 1:
                 datos_plan["arranque"] = opciones[0]
                 nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_DECISION_DURACION", "datos_plan": datos_plan}
-                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Arranque: **{opciones[0]}**. ¿Necesitas definir una duración? (sí/no)"}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Arranque: **{opciones[0]}**. ¿Necesitas definir una duración?"}
             else:
                 estado_actual["paso_diseno"] = "ESPERANDO_RESULTADO_ARRANQUE"
                 return {"nuevo_estado": estado_actual, "accion_ui": "MOSTRAR_RULETA", "opciones_ruleta": opciones}
@@ -291,10 +298,10 @@ class Guardian:
 
             datos_plan["arranque"] = comando
             nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_DECISION_DURACION", "datos_plan": datos_plan}
-            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Arranque: **{comando}**. ¿Necesitas definir una duración? (sí/no)"}
+            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": f"Arranque: **{comando}**. ¿Necesitas definir una duración?"}
             
         elif paso == "ESPERANDO_DECISION_DURACION":
-            if "si" in comando.lower():
+            if any(palabra in comando_lower for palabra in self.PALABRAS_SI):
                 nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_DURACION", "datos_plan": datos_plan}
                 return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Entendido. Dime las opciones para la duración."}
             else:
@@ -322,14 +329,14 @@ class Guardian:
             return self._presentar_borrador_contrato(datos_plan)
 
         elif paso == "ESPERANDO_CONFIRMACION_CONTRATO":
-            if "confirmar" in comando.lower():
+            if any(palabra in comando_lower for palabra in self.PALABRAS_CONFIRMACION):
                 return self._forjar_contrato(datos_plan)
-            elif "corregir" in comando.lower():
+            elif any(palabra in comando_lower for palabra in self.PALABRAS_CORRECCION):
                 nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_CAMPO_A_CORREGIR", "datos_plan": datos_plan}
                 mensaje = "Entendido. ¿Qué campo quieres corregir? (misión / arranque / duración)"
                 return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": mensaje}
             else:
-                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "No te he entendido. Por favor, responde 'confirmar' o 'corregir'."}
+                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "No te he entendido. Por favor, responde con algo como 'confirmar' o 'corregir'."}
 
         elif paso == "ESPERANDO_CAMPO_A_CORREGIR":
             campo_a_corregir = comando.lower()
@@ -349,12 +356,15 @@ class Guardian:
             opciones = [opt.strip() for opt in comando.split(',') if opt.strip()]
             
             if len(opciones) == 1:
-                datos_plan.pop("campo_en_edicion", None)
                 if campo_en_edicion == "misión":
                     datos_plan["mision"] = comando
-                    datos_plan.pop("especificaciones", None)
+                    datos_plan.pop("campo_en_edicion", None)
+                    if "especificaciones" in datos_plan:
+                        nuevo_estado = {"modo": "diseño", "paso_diseno": "PREGUNTAR_MANTENER_CAPAS", "datos_plan": datos_plan}
+                        return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Has cambiado la misión. ¿Quieres mantener las especificaciones (capas) actuales?"}
                 else:
                     datos_plan[campo_en_edicion] = comando
+                    datos_plan.pop("campo_en_edicion", None)
                 return self._presentar_borrador_contrato(datos_plan)
             
             else:
@@ -371,8 +381,17 @@ class Guardian:
                 else:
                     return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en la corrección con ruleta. Reiniciando."}
 
+        elif paso == "PREGUNTAR_MANTENER_CAPAS":
+            if any(palabra in comando_lower for palabra in self.PALABRAS_SI):
+                # No hacer nada, las capas se mantienen
+                pass
+            else:
+                # Borrar las capas
+                datos_plan.pop("especificaciones", None)
+            return self._presentar_borrador_contrato(datos_plan)
+
         elif paso == "ESPERANDO_ENCADENAR":
-            if "si" in comando.lower():
+            if any(palabra in comando_lower for palabra in self.PALABRAS_SI):
                 nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_MISION", "datos_plan": {}}
                 return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Perfecto. Define la misión para el nuevo contrato."}
             else:
@@ -389,7 +408,7 @@ class Guardian:
         plan_texto = "\n".join(plan_texto_lista)
 
         mensaje = (f"He generado el siguiente plan borrador:\n\n{plan_texto}\n\n"
-                   f"**¿Confirmas este plan o quieres corregir algo?** (confirmar/corregir)")
+                   f"**¿Confirmas este plan o quieres corregir algo?**")
         
         nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_CONFIRMACION_PLAN", "datos_bache": datos_bache}
         return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": mensaje}
@@ -398,6 +417,7 @@ class Guardian:
         paso = estado_actual.get("paso_transicion")
         datos_bache = estado_actual.get("datos_bache", {})
         zona_horaria_usuario = pytz.timezone("America/Montevideo")
+        comando_lower = comando.lower()
 
         if paso == "ESPERANDO_ACTIVIDAD_MADRE":
             datos_bache["actividad_madre"] = comando
@@ -412,7 +432,6 @@ class Guardian:
                 if fecha_inicio_madre < ahora:
                     fecha_inicio_madre += timedelta(days=1)
                 
-                # MEJORA: Eliminado el colchón de seguridad. El bache es el tiempo total.
                 bache_utilizable = int((fecha_inicio_madre - ahora).total_seconds() / 60)
 
                 if bache_utilizable < 20:
@@ -435,8 +454,7 @@ class Guardian:
             return self._presentar_borrador_transicion(datos_bache)
 
         elif paso == "ESPERANDO_CONFIRMACION_PLAN":
-            comando_lower = comando.lower()
-            if "confirmar" in comando_lower:
+            if any(palabra in comando_lower for palabra in self.PALABRAS_CONFIRMACION):
                 plan_final = datos_bache.get("plan_borrador", [])
                 itinerario_agendado, total_descansos = self._calendarizar_plan(plan_final, zona_horaria_usuario)
                 
@@ -451,7 +469,7 @@ class Guardian:
                     f"Itinerario para tu bache:\n\n{plan_texto}\n\n"
                     f"**Actividades planificadas:** {len(plan_final)}\n"
                     f"**Tiempo total planificado:** {tiempo_total_planificado} min\n"
-                    f"**Itinerario sellado:** {ahora.strftime('%d/%m/%y a las %I:%M %p')}\n" # MEJORA: Formato AM/PM
+                    f"**Itinerario sellado:** {ahora.strftime('%d/%m/%y a las %I:%M %p')}\n"
                     f"**Identificador:** {identificador}\n--------------------\n"
                     f"¡Itinerario sellado!"
                 )
@@ -461,27 +479,27 @@ class Guardian:
                     "id": identificador,
                     "itinerario": itinerario_agendado,
                     "fecha_sellado": ahora.strftime('%d/%m/%y'),
-                    "hora_sellado": ahora.strftime('%I:%M %p') # MEJORA: Formato AM/PM
+                    "hora_sellado": ahora.strftime('%I:%M %p')
                 }
                 self.archivador_contratos[identificador] = bache_obj
                 self._guardar_memoria()
                 
                 return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": mensaje_final}
 
-            elif "corregir" in comando_lower:
+            elif any(palabra in comando_lower for palabra in self.PALABRAS_CORRECCION):
                 nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_CATEGORIA_CORRECCION", "datos_bache": datos_bache}
                 return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Entendido. ¿Qué categoría quieres corregir? **(Tareas / Duraciones)**"}
             
             else:
-                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "No te he entendido. Por favor, responde 'confirmar' o 'corregir'."}
+                return {"nuevo_estado": estado_actual, "mensaje_para_ui": "No te he entendido. Por favor, responde con algo como 'confirmar' o 'corregir'."}
 
         elif paso == "ESPERANDO_CATEGORIA_CORRECCION":
-            if "tareas" in comando.lower():
+            if "tareas" in comando_lower:
                 nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_CORRECCION_TAREAS", "datos_bache": datos_bache}
                 plan_actual_texto = "\n".join([f"{i+1}. {t}" for i, t in enumerate(datos_bache.get("plan_borrador", []))])
                 mensaje = f"De acuerdo. Este es el plan actual:\n\n{plan_actual_texto}\n\nDime el número de la tarea a cambiar y el nuevo nombre.\n*Ej: 1 Jugar, 3 Dibujar*"
                 return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": mensaje}
-            elif "duraciones" in comando.lower():
+            elif "duraciones" in comando_lower:
                 nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_CORRECCION_DURACIONES", "datos_bache": datos_bache}
                 plan_actual_texto = "\n".join([f"{i+1}. {t}" for i, t in enumerate(datos_bache.get("plan_borrador", []))])
                 mensaje = f"De acuerdo. Este es el plan actual:\n\n{plan_actual_texto}\n\nDime el número de la tarea y la nueva duración. Si no pones duración, la elegiré yo.\n*Ej: 1: 25, 3, 4 (35 min)*"
@@ -552,54 +570,64 @@ class Guardian:
 
     async def ejecutar(self, datos):
         estado = datos.get("estado_conversacion", {"modo": "libre"})
-        comando = datos.get("comando", "")
+        comando = datos.get("comando", "").strip()
         comando_lower = comando.lower()
 
+        # --- GESTIÓN DE COMANDOS UNIVERSALES ---
+        if comando_lower == "cancelar":
+            return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Operación cancelada. Guardián en espera."}
+
         if comando == "_SALUDO_INICIAL_":
-            return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Guardián online. ¿Forjamos un Contrato o negociamos una Transición?"}
+            return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Guardián online. Para iniciar, di 'Activar [modo]'."}
 
-        palabras_clave_diseno = ["diseñar", "contrato", "forjar", "crear", "ruleta", "modo diseño"]
-        palabras_clave_transicion = ["transicion", "bache", "preparar", "plan", "agendar", "negociar"]
-        
-        if any(palabra in comando_lower for palabra in palabras_clave_transicion) and estado.get("modo") != "transicion":
-            nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_ACTIVIDAD_MADRE", "datos_bache": {}}
-            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Transición activado. ¿Cuál es la actividad principal que harás después?"}
-
-        if any(palabra in comando_lower for palabra in palabras_clave_diseno) and estado.get("modo") != "diseño":
-            match_id = re.search(r'([A-Z]{4,5}-[A-Z0-9]{4})', comando, re.IGNORECASE)
-            if match_id:
-                contrato_id = match_id.group(1).upper()
-                contrato = self.archivador_contratos.get(contrato_id)
-                if contrato:
-                    if contrato.get("tipo") == "Bache":
-                         contrato_texto = (
-                            f"**PLAN DE TRANSICIÓN RECUPERADO**\n--------------------\n"
-                            f"**Identificador:** {contrato['id']}\n"
-                            f"**Sellado:** {contrato['fecha_sellado']} a las {contrato['hora_sellado']}\n"
-                            f"**Itinerario:**\n" + "\n".join([f"- {linea}" for linea in contrato['itinerario']]) +
-                            "\n--------------------"
-                        )
-                    else:
-                        contrato_texto = (
-                            f"**CONTRATO RECUPERADO**\n--------------------\n"
-                            f"**Misión:** {contrato['mision']}\n"
-                            f"**Arranque:** {contrato['arranque']}\n"
-                            f"**Duración:** {contrato['duracion']}\n"
-                            f"**Sellado:** {contrato['fecha_sellado']} a las {contrato['hora_sellado']}\n"
-                            f"**Identificador:** {contrato['id']}\n--------------------"
-                        )
-                    return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": contrato_texto}
-                else:
-                    return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": f"No se encontró ningún plan con el identificador {contrato_id}."}
-
-            nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_MISION", "datos_plan": {}}
-            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Diseño activado. Define la misión."}
-
+        # --- GESTIÓN DE MODOS ACTIVOS ---
         if estado.get("modo") == "diseño":
             return self._gestionar_diseno(estado, comando)
         
         if estado.get("modo") == "transicion":
             return self._gestionar_transicion(estado, comando)
 
+        # --- LÓGICA DE ACTIVACIÓN DE MODOS (SOLO SI NO HAY UN MODO ACTIVO) ---
+        if comando_lower.startswith("activar"):
+            palabras_clave_diseno = ["diseño", "contrato", "forjar", "crear", "ruleta"]
+            palabras_clave_transicion = ["transicion", "bache", "preparar", "plan", "agendar", "negociar"]
+            
+            comando_sin_activar = comando_lower.replace("activar", "").strip()
+
+            if any(palabra in comando_sin_activar for palabra in palabras_clave_transicion):
+                nuevo_estado = {"modo": "transicion", "paso_transicion": "ESPERANDO_ACTIVIDAD_MADRE", "datos_bache": {}}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Transición activado. ¿Cuál es la actividad principal que harás después?"}
+
+            if any(palabra in comando_sin_activar for palabra in palabras_clave_diseno):
+                match_id = re.search(r'([A-Z]{4,5}-[A-Z0-9]{4})', comando, re.IGNORECASE)
+                if match_id:
+                    contrato_id = match_id.group(1).upper()
+                    contrato = self.archivador_contratos.get(contrato_id)
+                    if contrato:
+                        if contrato.get("tipo") == "Bache":
+                             contrato_texto = (
+                                f"**PLAN DE TRANSICIÓN RECUPERADO**\n--------------------\n"
+                                f"**Identificador:** {contrato['id']}\n"
+                                f"**Sellado:** {contrato['fecha_sellado']} a las {contrato['hora_sellado']}\n"
+                                f"**Itinerario:**\n" + "\n".join([f"- {linea}" for linea in contrato['itinerario']]) +
+                                "\n--------------------"
+                            )
+                        else:
+                            contrato_texto = (
+                                f"**CONTRATO RECUPERADO**\n--------------------\n"
+                                f"**Misión:** {contrato['mision']}\n"
+                                f"**Arranque:** {contrato['arranque']}\n"
+                                f"**Duración:** {contrato['duracion']}\n"
+                                f"**Sellado:** {contrato['fecha_sellado']} a las {contrato['hora_sellado']}\n"
+                                f"**Identificador:** {contrato['id']}\n--------------------"
+                            )
+                        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": contrato_texto}
+                    else:
+                        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": f"No se encontró ningún plan con el identificador {contrato_id}."}
+
+                nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_MISION", "datos_plan": {}}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Diseño activado. Define la misión."}
+
+        # --- MODO CHARLA POR DEFECTO ---
         respuesta_conversacional = await self._gestionar_charla_ia(comando)
         return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": respuesta_conversacional}
