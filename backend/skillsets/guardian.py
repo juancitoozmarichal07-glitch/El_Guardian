@@ -1,9 +1,10 @@
 # =================================================================
-# GUARDIAN.PY (v16.1 - El Reparador)
+# GUARDIAN.PY (v17.0 - El Espontáneo)
 # =================================================================
-# - CORRECCIÓN CRÍTICA: Se ha reparado el bug que rompía el encadenamiento de contratos.
-#   Ahora, al decir "sí" para forjar otro contrato, el Modo Diseño se reinicia correctamente.
-# - (Mantiene la eliminación del Modo Bache y todas las mejoras de la v15.0)
+# - NUEVO MODO "TICKET DE GANAS": Un modo rápido y ligero para tareas espontáneas.
+#   Se activa con "activar ticket [tarea]".
+# - JERARQUÍA DE TAREAS: Ahora diferencia entre "Contratos" (alta fricción) y "Tickets" (baja fricción).
+# - CÓDIGO LIMPIO: Mantiene la eliminación del Modo Bache y la estructura de la v16.1.
 
 import g4f
 import re
@@ -28,14 +29,14 @@ class Guardian:
         }
         # Listas de sinónimos para comandos flexibles
         self.PALABRAS_CONFIRMACION = ["confirmar", "confirmo", "acepto", "dale", "proceder", "adelante", "si", "sí", "seguro"]
-        self.PALABRAS_CORREccion = ["corregir", "corrijo", "editar", "cambiar", "modificar", "ajustar"]
+        self.PALABRAS_CORRECCION = ["corregir", "corrijo", "editar", "cambiar", "modificar", "ajustar"]
         self.PALABRAS_SI = ["si", "sí", "claro", "afirmativo", "acepto"]
         self.PALABRAS_NO = ["no", "negativo", "cancelar"]
         self.PALABRAS_DISENO_MULTIPLE = ["múltiple", "multiple", "combo", "ráfaga", "secuencia"]
         self.MISIONES_GENERICAS = ["estudiar", "trabajar", "leer", "programar", "escribir", "dibujar", "practicar", "ordenar", "limpiar"]
 
         self._cargar_memoria()
-        print(f"    - Especialista 'Guardian' v16.1 (El Reparador) listo.")
+        print(f"    - Especialista 'Guardian' v17.0 (El Espontáneo) listo.")
 
     # --- GESTIÓN DE MEMORIA PERSISTENTE ---
     def _cargar_memoria(self):
@@ -67,6 +68,44 @@ class Guardian:
         caracteres = string.ascii_uppercase + string.digits
         sufijo = ''.join(random.choices(caracteres, k=4))
         return f"{prefijo}-{sufijo}"
+
+    # --- FUNCIONES DEL MODO TICKET DE GANAS ---
+    def _gestionar_ticket(self, estado_actual, comando):
+        comando_sin_activar = re.sub(r'^activar\s+ticket\s*', '', comando, flags=re.IGNORECASE).strip()
+
+        if comando_sin_activar:
+            # Creación en un solo paso
+            return self._emitir_ticket(comando_sin_activar)
+        else:
+            # Creación en dos pasos
+            nuevo_estado = {"modo": "ticket", "paso_ticket": "ESPERANDO_TAREA"}
+            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Ticket de Ganas. Define la tarea."}
+
+    def _emitir_ticket(self, tarea):
+        if not tarea:
+            return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "La tarea del ticket no puede estar vacía. Operación cancelada."}
+
+        zona_horaria_usuario = pytz.timezone("America/Montevideo")
+        ahora = datetime.now(zona_horaria_usuario)
+        identificador = self._generar_id_aleatorio("TCKT")
+
+        ticket_obj = {
+            "tipo": "Ticket",
+            "id": identificador,
+            "tarea": tarea,
+            "fecha_emision": ahora.strftime("%d/%m/%y"),
+            "hora_emision": ahora.strftime("%H:%M")
+        }
+        self.archivador_contratos[identificador] = ticket_obj
+        self._guardar_memoria()
+
+        ticket_texto = (
+            f"**TICKET DE GANAS EMITIDO**\n--------------------\n"
+            f"**ID:** {identificador}\n"
+            f"**Tarea:** {tarea}\n"
+            f"**Emitido:** {ticket_obj['fecha_emision']} a las {ticket_obj['hora_emision']}\n--------------------"
+        )
+        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": ticket_texto}
 
     # --- FUNCIONES DEL MODO DISEÑO ---
     def _presentar_borrador_contrato(self, datos_plan):
@@ -411,37 +450,56 @@ class Guardian:
                 return self._gestionar_diseno_multiple(estado_combo, comando)
             return respuesta_diseno
 
-        if estado.get("modo") == "diseno":
+        if estado.get("modo") == "diseño":
             return self._gestionar_diseno(estado, comando)
         
         if estado.get("modo") == "diseno_multiple":
             return self._gestionar_diseno_multiple(estado, comando)
         
+        if estado.get("modo") == "ticket":
+            if estado.get("paso_ticket") == "ESPERANDO_TAREA":
+                return self._emitir_ticket(comando)
+            return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo de Ticket. Reiniciando."}
+
         # --- LÓGICA DE ACTIVACIÓN DE MODOS (SOLO SI NO HAY UN MODO ACTIVO) ---
         if comando_lower.startswith("activar"):
             palabras_clave_diseno = ["diseño", "contrato", "forjar", "crear", "ruleta"]
             comando_sin_activar = comando_lower.replace("activar", "").strip()
 
+            # Prioridad 1: Ticket de Ganas
+            if comando_sin_activar.startswith("ticket"):
+                return self._gestionar_ticket(estado, comando)
+
+            # Prioridad 2: Diseño Múltiple
             if any(palabra in comando_sin_activar for palabra in self.PALABRAS_DISENO_MULTIPLE):
                 return self._gestionar_diseno_multiple({"modo": "diseno_multiple"}, comando)
 
+            # Prioridad 3: Diseño Simple (y recuperación por ID)
             if any(palabra in comando_sin_activar for palabra in palabras_clave_diseno):
                 match_id = re.search(r'([A-Z]{4,5}-[A-Z0-9]{4})', comando, re.IGNORECASE)
                 if match_id:
-                    contrato_id = match_id.group(1).upper()
-                    contrato = self.archivador_contratos.get(contrato_id)
-                    if contrato:
-                        contrato_texto = (
-                            f"**CONTRATO RECUPERADO**\n--------------------\n"
-                            f"**Misión:** {contrato['mision']}\n"
-                            f"**Arranque:** {contrato['arranque']}\n"
-                            f"**Duración:** {contrato['duracion']}\n"
-                            f"**Sellado:** {contrato['fecha_sellado']} a las {contrato['hora_sellado']}\n"
-                            f"**Identificador:** {contrato['id']}\n--------------------"
-                        )
-                        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": contrato_texto}
+                    item_id = match_id.group(1).upper()
+                    item = self.archivador_contratos.get(item_id)
+                    if item:
+                        if item.get("tipo") == "Ticket":
+                            item_texto = (
+                                f"**TICKET RECUPERADO**\n--------------------\n"
+                                f"**ID:** {item['id']}\n"
+                                f"**Tarea:** {item['tarea']}\n"
+                                f"**Emitido:** {item['fecha_emision']} a las {item['hora_emision']}\n--------------------"
+                            )
+                        else: # Es un Contrato
+                            item_texto = (
+                                f"**CONTRATO RECUPERADO**\n--------------------\n"
+                                f"**Misión:** {item['mision']}\n"
+                                f"**Arranque:** {item['arranque']}\n"
+                                f"**Duración:** {item['duracion']}\n"
+                                f"**Sellado:** {item['fecha_sellado']} a las {item['hora_sellado']}\n"
+                                f"**Identificador:** {item['id']}\n--------------------"
+                            )
+                        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": item_texto}
                     else:
-                        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": f"No se encontró ningún plan con el identificador {contrato_id}."}
+                        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": f"No se encontró ningún item con el identificador {item_id}."}
 
                 nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_MISION", "datos_plan": {}}
                 return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Diseño activado. Define la misión."}
