@@ -1,11 +1,9 @@
 # =================================================================
-# GUARDIAN.PY (v16.0 - El Purista)
+# GUARDIAN.PY (v16.1 - El Reparador)
 # =================================================================
-# - ELIMINACIÓN MAYOR: Se ha eliminado por completo el "Modo Bache de Tiempo" (Transición).
-# - ENFOQUE TOTAL: El Guardián ahora se centra exclusivamente en la creación de Contratos
-#   a través del Modo Diseño y Diseño Múltiple.
-# - SIMPLIFICACIÓN: El código es más limpio, corto y fácil de mantener.
-# - (Mantiene todas las mejoras de la v15.0)
+# - CORRECCIÓN CRÍTICA: Se ha reparado el bug que rompía el encadenamiento de contratos.
+#   Ahora, al decir "sí" para forjar otro contrato, el Modo Diseño se reinicia correctamente.
+# - (Mantiene la eliminación del Modo Bache y todas las mejoras de la v15.0)
 
 import g4f
 import re
@@ -30,14 +28,14 @@ class Guardian:
         }
         # Listas de sinónimos para comandos flexibles
         self.PALABRAS_CONFIRMACION = ["confirmar", "confirmo", "acepto", "dale", "proceder", "adelante", "si", "sí", "seguro"]
-        self.PALABRAS_CORRECCION = ["corregir", "corrijo", "editar", "cambiar", "modificar", "ajustar"]
+        self.PALABRAS_CORREccion = ["corregir", "corrijo", "editar", "cambiar", "modificar", "ajustar"]
         self.PALABRAS_SI = ["si", "sí", "claro", "afirmativo", "acepto"]
         self.PALABRAS_NO = ["no", "negativo", "cancelar"]
         self.PALABRAS_DISENO_MULTIPLE = ["múltiple", "multiple", "combo", "ráfaga", "secuencia"]
         self.MISIONES_GENERICAS = ["estudiar", "trabajar", "leer", "programar", "escribir", "dibujar", "practicar", "ordenar", "limpiar"]
 
         self._cargar_memoria()
-        print(f"    - Especialista 'Guardian' v16.0 (El Purista) listo.")
+        print(f"    - Especialista 'Guardian' v16.1 (El Reparador) listo.")
 
     # --- GESTIÓN DE MEMORIA PERSISTENTE ---
     def _cargar_memoria(self):
