@@ -1,10 +1,11 @@
 # =================================================================
-# GUARDIAN.PY (v17.0 - El Espontáneo)
+# GUARDIAN.PY (v18.0 - El Analista)
 # =================================================================
-# - NUEVO MODO "TICKET DE GANAS": Un modo rápido y ligero para tareas espontáneas.
-#   Se activa con "activar ticket [tarea]".
-# - JERARQUÍA DE TAREAS: Ahora diferencia entre "Contratos" (alta fricción) y "Tickets" (baja fricción).
-# - CÓDIGO LIMPIO: Mantiene la eliminación del Modo Bache y la estructura de la v16.1.
+# - NUEVO MODO "TICKET DE ACCIÓN": Un modo inteligente que analiza el texto del usuario.
+#   Extrae automáticamente Tarea, Arranque y Duración desde una sola frase.
+# - FLUJO CONVERSACIONAL: El modo ticket ahora dialoga con el usuario.
+# - ENCADENAMIENTO DE TICKETS: Permite crear múltiples tickets en una sola sesión.
+# - FILOSOFÍA REFINADA: Distingue claramente entre Contratos (fricción) y Tickets (enfoque).
 
 import g4f
 import re
@@ -36,7 +37,7 @@ class Guardian:
         self.MISIONES_GENERICAS = ["estudiar", "trabajar", "leer", "programar", "escribir", "dibujar", "practicar", "ordenar", "limpiar"]
 
         self._cargar_memoria()
-        print(f"    - Especialista 'Guardian' v17.0 (El Espontáneo) listo.")
+        print(f"    - Especialista 'Guardian' v18.0 (El Analista) listo.")
 
     # --- GESTIÓN DE MEMORIA PERSISTENTE ---
     def _cargar_memoria(self):
@@ -69,22 +70,43 @@ class Guardian:
         sufijo = ''.join(random.choices(caracteres, k=4))
         return f"{prefijo}-{sufijo}"
 
-    # --- FUNCIONES DEL MODO TICKET DE GANAS ---
-    def _gestionar_ticket(self, estado_actual, comando):
-        comando_sin_activar = re.sub(r'^activar\s+ticket\s*', '', comando, flags=re.IGNORECASE).strip()
+    # --- FUNCIONES DEL MODO TICKET DE ACCIÓN ---
+    def _analizar_texto_ticket(self, texto):
+        """
+        Analiza el texto del usuario para extraer Tarea, Arranque y Duración.
+        """
+        tarea = texto
+        arranque = "No definido"
+        duracion = "No definida"
 
-        if comando_sin_activar:
-            # Creación en un solo paso
-            return self._emitir_ticket(comando_sin_activar)
-        else:
-            # Creación en dos pasos
-            nuevo_estado = {"modo": "ticket", "paso_ticket": "ESPERANDO_TAREA"}
-            return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Ticket de Ganas. Define la tarea."}
+        # Buscar hora de arranque (ej: a las 14:30)
+        match_arranque = re.search(r'a las\s+(\d{1,2}:\d{2})', texto, re.IGNORECASE)
+        if match_arranque:
+            arranque = match_arranque.group(1)
+            tarea = tarea.replace(match_arranque.group(0), "").strip()
 
-    def _emitir_ticket(self, tarea):
-        if not tarea:
-            return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "La tarea del ticket no puede estar vacía. Operación cancelada."}
+        # Buscar duración (ej: durante 25 min, (25 min))
+        match_duracion = re.search(r'(?:durante\s+|por\s+)?\(?(\d+)\s*min(?:utos)?\)?', texto, re.IGNORECASE)
+        if match_duracion:
+            duracion = f"{match_duracion.group(1)} min"
+            tarea = tarea.replace(match_duracion.group(0), "").strip()
+        
+        # Limpiar frases introductorias comunes
+        frases_a_limpiar = [
+            "bueno mira tengo ganas de", "tengo ganas de", "quiero", "voy a"
+        ]
+        for frase in frases_a_limpiar:
+            if tarea.lower().startswith(frase):
+                tarea = tarea[len(frase):].strip()
 
+        return tarea.capitalize(), arranque, duracion
+
+    def _emitir_ticket(self, detalles_texto):
+        if not detalles_texto:
+            return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "La descripción del ticket no puede estar vacía. Operación cancelada."}
+
+        tarea, arranque, duracion = self._analizar_texto_ticket(detalles_texto)
+        
         zona_horaria_usuario = pytz.timezone("America/Montevideo")
         ahora = datetime.now(zona_horaria_usuario)
         identificador = self._generar_id_aleatorio("TCKT")
@@ -93,6 +115,8 @@ class Guardian:
             "tipo": "Ticket",
             "id": identificador,
             "tarea": tarea,
+            "arranque": arranque,
+            "duracion": duracion,
             "fecha_emision": ahora.strftime("%d/%m/%y"),
             "hora_emision": ahora.strftime("%H:%M")
         }
@@ -100,12 +124,17 @@ class Guardian:
         self._guardar_memoria()
 
         ticket_texto = (
-            f"**TICKET DE GANAS EMITIDO**\n--------------------\n"
+            f"**TICKET DE ACCIÓN EMITIDO**\n--------------------\n"
             f"**ID:** {identificador}\n"
             f"**Tarea:** {tarea}\n"
-            f"**Emitido:** {ticket_obj['fecha_emision']} a las {ticket_obj['hora_emision']}\n--------------------"
+            f"**Arranque:** {arranque}\n"
+            f"**Duración:** {duracion}\n"
+            f"**Emitido:** {ticket_obj['fecha_emision']} a las {ticket_obj['hora_emision']}\n--------------------\n\n"
+            f"¿Deseas gestionar otro ticket?"
         )
-        return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": ticket_texto}
+        
+        nuevo_estado = {"modo": "ticket", "paso_ticket": "ESPERANDO_ENCADENAR"}
+        return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": ticket_texto}
 
     # --- FUNCIONES DEL MODO DISEÑO ---
     def _presentar_borrador_contrato(self, datos_plan):
@@ -457,8 +486,14 @@ class Guardian:
             return self._gestionar_diseno_multiple(estado, comando)
         
         if estado.get("modo") == "ticket":
-            if estado.get("paso_ticket") == "ESPERANDO_TAREA":
+            if estado.get("paso_ticket") == "ESPERANDO_DETALLES":
                 return self._emitir_ticket(comando)
+            elif estado.get("paso_ticket") == "ESPERANDO_ENCADENAR":
+                if any(palabra in comando_lower for palabra in self.PALABRAS_SI):
+                    nuevo_estado = {"modo": "ticket", "paso_ticket": "ESPERANDO_DETALLES"}
+                    return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Genial. Dame los detalles del siguiente ticket."}
+                else:
+                    return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Entendido. Guardián en espera."}
             return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo de Ticket. Reiniciando."}
 
         # --- LÓGICA DE ACTIVACIÓN DE MODOS (SOLO SI NO HAY UN MODO ACTIVO) ---
@@ -466,9 +501,10 @@ class Guardian:
             palabras_clave_diseno = ["diseño", "contrato", "forjar", "crear", "ruleta"]
             comando_sin_activar = comando_lower.replace("activar", "").strip()
 
-            # Prioridad 1: Ticket de Ganas
+            # Prioridad 1: Ticket de Acción
             if comando_sin_activar.startswith("ticket"):
-                return self._gestionar_ticket(estado, comando)
+                nuevo_estado = {"modo": "ticket", "paso_ticket": "ESPERANDO_DETALLES"}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Genial, creando ticket. Dame los detalles."}
 
             # Prioridad 2: Diseño Múltiple
             if any(palabra in comando_sin_activar for palabra in self.PALABRAS_DISENO_MULTIPLE):
@@ -486,6 +522,8 @@ class Guardian:
                                 f"**TICKET RECUPERADO**\n--------------------\n"
                                 f"**ID:** {item['id']}\n"
                                 f"**Tarea:** {item['tarea']}\n"
+                                f"**Arranque:** {item.get('arranque', 'No definido')}\n"
+                                f"**Duración:** {item.get('duracion', 'No definida')}\n"
                                 f"**Emitido:** {item['fecha_emision']} a las {item['hora_emision']}\n--------------------"
                             )
                         else: # Es un Contrato
