@@ -1,11 +1,10 @@
 # =================================================================
-# GUARDIAN.PY (v18.0 - El Analista)
+# GUARDIAN.PY (v19.0 - El Intérprete)
 # =================================================================
-# - NUEVO MODO "TICKET DE ACCIÓN": Un modo inteligente que analiza el texto del usuario.
-#   Extrae automáticamente Tarea, Arranque y Duración desde una sola frase.
-# - FLUJO CONVERSACIONAL: El modo ticket ahora dialoga con el usuario.
-# - ENCADENAMIENTO DE TICKETS: Permite crear múltiples tickets en una sola sesión.
-# - FILOSOFÍA REFINADA: Distingue claramente entre Contratos (fricción) y Tickets (enfoque).
+# - INTELIGENCIA DE EXTRACCIÓN: El Modo Ticket ahora entiende y extrae la acción pura de frases como "Necesito tender la cama".
+# - VOCABULARIO FLEXIBLE: Se puede usar "crear" o "gestionar" además de "activar" para iniciar los modos.
+# - TONO DE GUARDIÁN MEJORADO: Las respuestas de activación son más acordes a la personalidad del Guardián.
+# - BUGFIX DE ENCADENAMIENTO: Corregido el error que impedía encadenar la creación de tickets.
 
 import g4f
 import re
@@ -28,7 +27,8 @@ class Guardian:
             "fecha_ultima_racha": None,
             "logros": []
         }
-        # Listas de sinónimos para comandos flexibles
+        # Listas de sinónimos y palabras clave
+        self.PALABRAS_ACTIVACION = ["activar", "crear", "gestionar"]
         self.PALABRAS_CONFIRMACION = ["confirmar", "confirmo", "acepto", "dale", "proceder", "adelante", "si", "sí", "seguro"]
         self.PALABRAS_CORRECCION = ["corregir", "corrijo", "editar", "cambiar", "modificar", "ajustar"]
         self.PALABRAS_SI = ["si", "sí", "claro", "afirmativo", "acepto"]
@@ -37,7 +37,7 @@ class Guardian:
         self.MISIONES_GENERICAS = ["estudiar", "trabajar", "leer", "programar", "escribir", "dibujar", "practicar", "ordenar", "limpiar"]
 
         self._cargar_memoria()
-        print(f"    - Especialista 'Guardian' v18.0 (El Analista) listo.")
+        print(f"    - Especialista 'Guardian' v19.0 (El Intérprete) listo.")
 
     # --- GESTIÓN DE MEMORIA PERSISTENTE ---
     def _cargar_memoria(self):
@@ -74,6 +74,7 @@ class Guardian:
     def _analizar_texto_ticket(self, texto):
         """
         Analiza el texto del usuario para extraer Tarea, Arranque y Duración.
+        Ahora es más inteligente para extraer la acción pura.
         """
         tarea = texto
         arranque = "No definido"
@@ -91,13 +92,13 @@ class Guardian:
             duracion = f"{match_duracion.group(1)} min"
             tarea = tarea.replace(match_duracion.group(0), "").strip()
         
-        # Limpiar frases introductorias comunes
-        frases_a_limpiar = [
-            "bueno mira tengo ganas de", "tengo ganas de", "quiero", "voy a"
+        # Limpiar frases de intención para extraer la acción pura
+        frases_intencion = [
+            r'^bueno mira tengo ganas de\s+', r'^tengo ganas de\s+', r'^necesito\s+',
+            r'^tengo que\s+', r'^debería\s+', r'^es hora de\s+', r'^voy a\s+', r'^quiero\s+'
         ]
-        for frase in frases_a_limpiar:
-            if tarea.lower().startswith(frase):
-                tarea = tarea[len(frase):].strip()
+        for patron in frases_intencion:
+            tarea = re.sub(patron, '', tarea, flags=re.IGNORECASE).strip()
 
         return tarea.capitalize(), arranque, duracion
 
@@ -242,12 +243,12 @@ class Guardian:
                     return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": mensaje}
                 
                 nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ARRANQUE", "datos_plan": datos_plan}
-                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Misión definida. Ahora, define el **momento de arranque**."}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Misión definida. Ahora, define el momento de arranque."}
 
         elif paso == "VALIDANDO_ESPECIFICACION":
             if any(palabra in comando_lower for palabra in self.PALABRAS_SI):
                 nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_ARRANQUE", "datos_plan": datos_plan}
-                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Entendido. Misión definida. Ahora, define el **momento de arranque**."}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Entendido. Misión definida. Ahora, define el momento de arranque."}
             else:
                 nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_OPCIONES_ESPECIFICACION", "datos_plan": datos_plan}
                 return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Perfecto. Dame las opciones para la siguiente capa."}
@@ -391,7 +392,7 @@ class Guardian:
         elif paso == "ESPERANDO_ENCADENAR":
             if any(palabra in comando_lower for palabra in self.PALABRAS_SI):
                 nuevo_estado = {"modo": "diseño", "paso_diseno": "ESPERANDO_MISION", "datos_plan": {}}
-                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Perfecto. Define la misión para el nuevo contrato."}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Modo Diseño reiniciado. Define la misión."}
             else:
                 return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Entendido. Guardián en espera."}
             
@@ -468,7 +469,7 @@ class Guardian:
             return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Operación cancelada. Guardián en espera."}
 
         if comando == "_SALUDO_INICIAL_":
-            return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Guardián online. Para iniciar, di 'Activar [modo]'."}
+            return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Guardián online. Para iniciar, di 'Crear [modo]'."}
 
         # --- GESTIÓN DE MODOS ACTIVOS ---
         if estado.get("estado_combo_padre"):
@@ -491,26 +492,27 @@ class Guardian:
             elif estado.get("paso_ticket") == "ESPERANDO_ENCADENAR":
                 if any(palabra in comando_lower for palabra in self.PALABRAS_SI):
                     nuevo_estado = {"modo": "ticket", "paso_ticket": "ESPERANDO_DETALLES"}
-                    return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Genial. Dame los detalles del siguiente ticket."}
+                    return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Entendido. Describe la tarea para el siguiente ticket."}
                 else:
                     return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Entendido. Guardián en espera."}
             return {"nuevo_estado": {"modo": "libre"}, "mensaje_para_ui": "Error en el flujo de Ticket. Reiniciando."}
 
         # --- LÓGICA DE ACTIVACIÓN DE MODOS (SOLO SI NO HAY UN MODO ACTIVO) ---
-        if comando_lower.startswith("activar"):
-            palabras_clave_diseno = ["diseño", "contrato", "forjar", "crear", "ruleta"]
-            comando_sin_activar = comando_lower.replace("activar", "").strip()
+        comando_partes = comando_lower.split()
+        if comando_partes and comando_partes[0] in self.PALABRAS_ACTIVACION:
+            comando_sin_activar = " ".join(comando_partes[1:])
 
             # Prioridad 1: Ticket de Acción
             if comando_sin_activar.startswith("ticket"):
                 nuevo_estado = {"modo": "ticket", "paso_ticket": "ESPERANDO_DETALLES"}
-                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Genial, creando ticket. Dame los detalles."}
+                return {"nuevo_estado": nuevo_estado, "mensaje_para_ui": "Entendido. Modo Ticket de Acción iniciado. Describe la tarea a ejecutar."}
 
             # Prioridad 2: Diseño Múltiple
             if any(palabra in comando_sin_activar for palabra in self.PALABRAS_DISENO_MULTIPLE):
                 return self._gestionar_diseno_multiple({"modo": "diseno_multiple"}, comando)
 
             # Prioridad 3: Diseño Simple (y recuperación por ID)
+            palabras_clave_diseno = ["diseño", "contrato", "forjar", "ruleta"]
             if any(palabra in comando_sin_activar for palabra in palabras_clave_diseno):
                 match_id = re.search(r'([A-Z]{4,5}-[A-Z0-9]{4})', comando, re.IGNORECASE)
                 if match_id:
